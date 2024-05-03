@@ -2,7 +2,7 @@
 
 # Libraries ---------------------------------------------------------------
 
-library(tidyverse)
+library(ggplot2)
 library(survival)
 
 
@@ -23,17 +23,27 @@ hist(data$tempo_pag, xlab="Tempo Pagamento",
 # estimated Kaplan-Meier curve
 # curva de Kaplan-Meier estimada
 ekm <- survfit(Surv(time = tempo_pag, event = status) ~ 1, data = data)
-ekm_df <- data.frame(time = ekm$time,
-                     surv = ekm$surv)
+ekm_df <- data.frame(tempo = ekm$time,
+                     km = ekm$surv)
 
-ggplot(data = ekm_df, mapping = aes(time, surv)) + 
+# graph with limits
+ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
     geom_line() + labs(x = "Tempos", y = "S(t)") +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
     geom_hline(yintercept = 0.76, linetype="dashed", color = "red") +
     geom_hline(yintercept = 0.215, linetype="dashed", color = "red") +
     geom_text(label = "1-p0", x = 0, y = 0.81, size = 8/.pt) +
     geom_text(label = "p1", x = 0, y = 0.19, size = 8/.pt) +
-    theme_bw()
+    theme_classic()
+
+# graph of Kaplan-Meyer adjust
+ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
+    geom_step() + 
+    labs(x = "Tempos", y = "S(t)") +
+    ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
+    theme_classic() + 
+    theme(legend.position = c(0.8,0.8),
+          legend.background = element_rect(color = "white"))
 
 # estimated Kaplan-Meier curve with query covariate
 # curva de Kaplan-Meier estimada com covariável de consulta
@@ -54,9 +64,10 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
 # gráfico alisado
 ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
     geom_line(aes(color = as.factor(consulta))) + 
-    labs(x = "Tempos", y = "S(t)", color = "Consulta") +
+    labs(x = "Tempos", y = "S(t)", color = "Inform. Consulta") +
+    scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"), values = c(2,4)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
-    theme_bw() + 
+    theme_classic() + 
     theme(legend.position = c(0.8,0.8),
           legend.background = element_rect(color = "white"))
 
@@ -110,7 +121,7 @@ sobrevGTDL <- function(x, par) {
 
 # parameter estimation
 # estimação dos parâmetros
-emv <- optim(par=c(0.1,0.3,0.5,2), veroGTDL, x=data)
+emv <- optim(par=c(0.1,0.3,0.5,2), veroGTDL, x=data, hessian = TRUE)
 epar <- c(emv$par[1], exp(emv$par[2]), exp(emv$par[3]), emv$par[4])
 
 ekm_df$gtdl <- sobrevGTDL(x = ekm_df[,c(1,3)], par = epar)
@@ -122,11 +133,35 @@ ggplot(data = ekm_df, mapping = aes(tempo, gtdl)) +
     geom_line(aes(x = tempo, y = km, color = as.factor(consulta))) +
     labs(x = "Tempos", y = "S(t)", color = "Consulta por KM", linetype = "Consulta por GTDL") +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_bw() + 
+    theme_classic() + 
     theme(legend.position = c(0.8,0.7),
           legend.background = element_rect(color = "white"))
 
-# Testing
-# X <- data.frame(tempo = data$tempo_pag,
-#                 consulta = as.factor(data$consulta),
-#                 gtdl = sobrevGTDL(x = data[,2:3], par = epar))
+
+# estimation of the confidence interval of the parameters
+# estimação do intervalo de confiança dos parâmetros
+emv <- optim(par=c(0.1,0.3,0.5,2), veroGTDL, x=data, hessian = TRUE)
+epar <- c(emv$par[1], exp(emv$par[2]), exp(emv$par[3]), emv$par[4])
+epar
+sd <- sqrt(diag(solve(emv$hessian)))
+sd
+
+ic_alpha <- numeric()
+ic_alpha[1] <- emv$par[1] -qnorm(0.975)*sd[1]
+ic_alpha[2] <- emv$par[1] +qnorm(0.975)*sd[1]
+ic_alpha
+
+ic_lambda <- numeric()
+ic_lambda[1] <- emv$par[2] -qnorm(0.975)*sd[2]
+ic_lambda[2] <- emv$par[2] +qnorm(0.975)*sd[2]
+ic_lambda
+
+ic_theta <- numeric()
+ic_theta[1] <- emv$par[3] -qnorm(0.975)*sd[3]
+ic_theta[2] <- emv$par[3] +qnorm(0.975)*sd[3]
+ic_theta
+
+ic_beta <- numeric()
+ic_beta[1] <- emv$par[4] -qnorm(0.975)*sd[4]
+ic_beta[2] <- emv$par[4] +qnorm(0.975)*sd[4]
+ic_beta
