@@ -132,6 +132,8 @@ ggplot(data = ekm_df, mapping = aes(tempo, gtdl)) +
     geom_line(aes(linetype = as.factor(consulta))) +
     geom_line(aes(x = tempo, y = km, color = as.factor(consulta))) +
     labs(x = "Tempos", y = "S(t)", color = "Consulta por KM", linetype = "Consulta por GTDL") +
+    scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"), values = c(2,4)) +
+    scale_linetype_manual(labels = c("0 - Com consulta", "1 - Sem consulta"), values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
     theme_classic() + 
     theme(legend.position = c(0.8,0.7),
@@ -141,8 +143,7 @@ ggplot(data = ekm_df, mapping = aes(tempo, gtdl)) +
 # estimation of the confidence interval of the parameters
 # estimação do intervalo de confiança dos parâmetros
 emv <- optim(par=c(0.1,0.3,0.5,2), veroGTDL, x=data, hessian = TRUE)
-epar <- c(emv$par[1], exp(emv$par[2]), exp(emv$par[3]), emv$par[4])
-epar
+emv$par
 sd <- sqrt(diag(solve(emv$hessian)))
 sd
 
