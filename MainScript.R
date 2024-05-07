@@ -9,8 +9,10 @@ library(survival)
 # Load and Treatment Data -------------------------------------------------
 
 data <- read.csv(file = "recuperaInadimplencia.csv")
-data <- data[,2:4]
-
+data <- data.frame(status = data$status,
+                   tempo_pag = data$tempo_pag,
+                   interc = rep(1,nrow(data)),
+                   consulta = data$consulta)
 
 
 # Descriptive Analysis ------------------------------------------------------
@@ -83,13 +85,14 @@ veroGTDL <- function(x, par) {
     lambd <- exp(par[2])
     thet <- exp(par[3])
     bet <- par[4:length(par)]
+    
     # covariates
     X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
     X0 <- as.matrix(x[x$tempo == 0, 3:ncol(x)])
     cens <- x[x$tempo > 0,1]
     tempo <- x[x$tempo > 0,2]
     # model
-    aux1 <- sum( (X0%*%bet) - log( 1 + exp(X0%*%bet) ) )
+    aux1 <- sum( (X0%*%bet) ) - sum( log( 1 + exp(X0%*%bet) ) )
     aux2 <- log(lambd)*sum(cens) - 
         sum( log( 1 + exp(X%*%bet) ) ) +
         sum( cens*(alph*tempo + X%*%bet)) -
