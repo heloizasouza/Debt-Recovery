@@ -138,7 +138,7 @@ sobrevGTDL <- function(x, par) {
 
 # parameter estimation of GTDL Gamma
 # estimação dos parâmetros do GTDL Gamma
-emvg <- optim(par=c(1,4,2,6), veroGTDL, x=data, hessian = TRUE)
+emvg <- optim(par=c(0.1,-0.5,-0.5,0.1), veroGTDL, x=data, hessian = TRUE)
 egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
 
 # parameter estimation of zero inflation
@@ -178,7 +178,7 @@ ggplot(data = ekm_df, mapping = aes(tempo, gtdl)) +
 # estimação do intervalo de confiança dos parâmetros
 sd0 <- sqrt(diag(solve(emv0$hessian)))
 sdg <- sqrt(diag(solve(emvg$hessian)))
-sd
+sdg;sd0
 
 ic_alpha <- numeric()
 ic_alpha[1] <- emv$par[1] -qnorm(0.975)*sd[1]
