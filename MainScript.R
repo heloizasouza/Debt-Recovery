@@ -74,7 +74,21 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
 
 # Modeling ----------------------------------------------------------------
 
-# verisimilitude of GTDL Gamma
+
+# likelihood of zero inflation
+# verossimilhança da inflação de zeros
+veroZero <- function(x, beta) {
+    
+    # covariates
+    X0 <- as.matrix(x[x$tempo == 0, 3:ncol(x)])
+    X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
+     
+    # model
+    aux1 <- sum((X0%*%beta)) - sum(log( 1 + exp(X0%*%beta))) - sum(log(1 + exp(X%*%beta)))
+    return(-aux1)
+}
+
+# likelihood of GTDL Gamma
 # verossimilhança da GTDL Gamma
 veroGTDL <- function(x, par) {
     
@@ -136,7 +150,7 @@ ggplot(data = ekm_df, mapping = aes(tempo, gtdl)) +
     scale_linetype_manual(labels = c("0 - Com consulta", "1 - Sem consulta"), values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
     theme_classic() + 
-    theme(legend.position = c(0.8,0.7),
+    theme(legend.position.inside = c(0.8,0.7),
           legend.background = element_rect(color = "white"))
 
 
