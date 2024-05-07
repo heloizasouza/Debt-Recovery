@@ -10,7 +10,10 @@ library(survival)
 
 data <- read.csv(file = "recuperaInadimplencia.csv")
 data <- data[,2:4]
-
+data0 <- data.frame(status = data$status,
+                    tempo_pag = data$tempo_pag,
+                    interc = rep(1,nrow(data)),
+                    consulta = data$consulta)
 
 
 # Descriptive Analysis ------------------------------------------------------
@@ -97,34 +100,34 @@ veroGTDL <- function(x, par) {
     lambd <- exp(par[2])
     thet <- exp(par[3])
     bet <- par[4:length(par)]
+    
     # covariates
     X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
-    X0 <- as.matrix(x[x$tempo == 0, 3:ncol(x)])
     cens <- x[x$tempo > 0,1]
     tempo <- x[x$tempo > 0,2]
+    
     # model
-    aux1 <- sum( (X0%*%bet) - log( 1 + exp(X0%*%bet) ) )
-    aux2 <- log(lambd)*sum(cens) - 
-        sum( log( 1 + exp(X%*%bet) ) ) +
+    aux2 <- log(lambd)*sum(cens) +
         sum( cens*(alph*tempo + X%*%bet)) -
         sum( cens*log( 1 + exp(alph*tempo + X%*%bet) ) ) - 
         sum( (cens + (1/thet))*log( 1 + ((thet*lambd/alph)*log( (1 + exp(alph*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
-    
-    aux <- aux1 + aux2
-    return(-aux)
+
+    return(-aux2)
 }
 
 # GTDL Zero Gamma Inflated Survival Model
 # modelo de sobrevivência da GTDL Gama zero inflacionada
 sobrevGTDL <- function(x, par) {
     
-    alph <- par[1]
-    lambd <- par[2]
-    thet <- par[3]
-    bet <- par[4:length(par)]
+    bet0 <- par[1:2]
+    alph <- par[3]
+    lambd <- par[4]
+    thet <- par[5]
+    bet <- par[6:length(par)]
     tempo <- x$tempo
     X <- as.matrix(x[, 2:ncol(x)])
-    st <- (1/(1 + exp(X%*%bet) )) * (1 + ( (lambd*thet/alph) * log( (1 + exp(alph*tempo + X%*%bet) )/(1 + exp(X%*%bet))) ) )^(-1/thet)
+    X0 <- matrix(data = c(rep(1,nrow(x)),X), nrow = nrow(x), ncol = ncol(x))
+    st <- (1/(1 + exp(X0%*%bet0) )) * (1 + ( (lambd*thet/alph) * log( (1 + exp(alph*tempo + X%*%bet) )/(1 + exp(X%*%bet))) ) )^(-1/thet)
     
     return(st)
 }
@@ -133,11 +136,28 @@ sobrevGTDL <- function(x, par) {
 
 # Aplication --------------------------------------------------------------
 
-# parameter estimation
-# estimação dos parâmetros
-emv <- optim(par=c(0.1,0.3,0.5,2), veroGTDL, x=data, hessian = TRUE)
-epar <- c(emv$par[1], exp(emv$par[2]), exp(emv$par[3]), emv$par[4])
+# parameter estimation of GTDL Gamma
+# estimação dos parâmetros do GTDL Gamma
+emvg <- optim(par=c(1,4,2,6), veroGTDL, x=data, hessian = TRUE)
+egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
 
+# parameter estimation of zero inflation
+# estimação dos parâmetros da inflação de zeros
+emv0 <- optim(par=c(2,1), veroZero, x=data0, hessian = TRUE)
+e0par <- c(emv0$par[1], emv0$par[2])
+
+# combinando os parâmetros estimados
+epar <- c(e0par, egpar)
+
+# estimated Kaplan-Meier curve with query covariate
+# curva de Kaplan-Meier estimada com covariável de consulta
+ekm <- survfit(Surv(time = tempo_pag, event = status) ~ consulta, data = data)
+ekm_df <- data.frame(tempo = ekm$time,
+                     km = ekm$surv,
+                     consulta = c(rep(0,44),rep(1,61)) )
+
+# GTDL survival curve estimation
+# estimação da curva de sobrevivência GTDL
 ekm_df$gtdl <- sobrevGTDL(x = ekm_df[,c(1,3)], par = epar)
 
 # Graph of survival curves by Kaplan Meyer (KM) and GTDL
@@ -150,15 +170,14 @@ ggplot(data = ekm_df, mapping = aes(tempo, gtdl)) +
     scale_linetype_manual(labels = c("0 - Com consulta", "1 - Sem consulta"), values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
     theme_classic() + 
-    theme(legend.position.inside = c(0.8,0.7),
+    theme(legend.position = c(0.8,0.7),
           legend.background = element_rect(color = "white"))
 
 
 # estimation of the confidence interval of the parameters
 # estimação do intervalo de confiança dos parâmetros
-emv <- optim(par=c(0.1,0.3,0.5,2), veroGTDL, x=data, hessian = TRUE)
-emv$par
-sd <- sqrt(diag(solve(emv$hessian)))
+sd0 <- sqrt(diag(solve(emv0$hessian)))
+sdg <- sqrt(diag(solve(emvg$hessian)))
 sd
 
 ic_alpha <- numeric()
