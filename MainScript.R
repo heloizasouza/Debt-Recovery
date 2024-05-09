@@ -1,4 +1,4 @@
-
+rm(list = ls())
 
 # Libraries ---------------------------------------------------------------
 
@@ -96,21 +96,22 @@ veroZero <- function(x, beta) {
 veroGTDL <- function(x, par) {
     
     # parameters
-    alph <- par[1]
-    lambd <- exp(par[2])
-    thet <- exp(par[3])
-    bet <- par[4:length(par)]
+    alph <- par[1:2]
+    lambd <- exp(par[3])
+    thet <- exp(par[4])
+    bet <- par[5:length(par)]
     
     # covariates
     X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
+    xalpha <- matrix(c(rep(1,nrow(X)),X), ncol = ncol(X)+1)
     cens <- x[x$tempo > 0,1]
     tempo <- x[x$tempo > 0,2]
     
     # model
     aux2 <- log(lambd)*sum(cens) +
-        sum( cens*(alph*tempo + X%*%bet)) -
-        sum( cens*log( 1 + exp(alph*tempo + X%*%bet) ) ) - 
-        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/alph)*log( (1 + exp(alph*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
+        sum( cens*((xalpha%*%alph)*tempo + X%*%bet)) -
+        sum( cens*log( 1 + exp((xalpha%*%alph)*tempo + X%*%bet) ) ) - 
+        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/(xalpha%*%alph))*log( (1 + exp((xalpha%*%alph)*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
 
     return(-aux2)
 }
@@ -120,14 +121,15 @@ veroGTDL <- function(x, par) {
 sobrevGTDL <- function(x, par) {
     
     bet0 <- par[1:2]
-    alph <- par[3]
-    lambd <- par[4]
-    thet <- par[5]
-    bet <- par[6:length(par)]
+    alph <- par[3:4]
+    lambd <- par[5]
+    thet <- par[6]
+    bet <- par[7:length(par)]
     tempo <- x$tempo
     X <- as.matrix(x[, 2:ncol(x)])
     X0 <- matrix(data = c(rep(1,nrow(x)),X), nrow = nrow(x), ncol = ncol(x))
-    st <- (1/(1 + exp(X0%*%bet0) )) * (1 + ( (lambd*thet/alph) * log( (1 + exp(alph*tempo + X%*%bet) )/(1 + exp(X%*%bet))) ) )^(-1/thet)
+    xalpha <- matrix(c(rep(1,nrow(X)),X), ncol = ncol(X)+1)
+    st <- (1/(1 + exp(X0%*%bet0) )) * (1 + ( (lambd*thet/(xalpha%*%alph)) * log( (1 + exp((xalpha%*%alph)*tempo + X%*%bet) )/(1 + exp(X%*%bet))) ) )^(-1/thet)
     
     return(st)
 }
@@ -138,8 +140,8 @@ sobrevGTDL <- function(x, par) {
 
 # parameter estimation of GTDL Gamma
 # estimação dos parâmetros do GTDL Gamma
-emvg <- optim(par=c(0.1,-0.5,-0.5,0.1), veroGTDL, x=data, hessian = TRUE)
-egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
+emvg <- optim(par=c(0.1,0.5,-0.5,-0.5,0.1), veroGTDL, x=data, hessian = TRUE)
+egpar <- c(emvg$par[1], emvg$par[2], exp(emvg$par[3]), exp(emvg$par[4]), emvg$par[5])
 
 # parameter estimation of zero inflation
 # estimação dos parâmetros da inflação de zeros
