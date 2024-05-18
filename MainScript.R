@@ -75,6 +75,80 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
           legend.background = element_rect(color = "white"))
 
 
+
+# Model 1 GTDL Gamma ------------------------------------------------------
+
+# likelihoof of GRTDL Gamma
+veroGTDLg <- function(x, par) {
+    
+    # parameters
+    alph <- par[1]
+    lambd <- exp(par[2])
+    thet <- exp(par[3])
+    bet <- par[4:length(par)]
+    
+    # covariates
+    X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
+    cens <- x[x$tempo > 0,1]
+    tempo <- x[x$tempo > 0,2]
+    
+    # model
+    aux2 <- log(lambd)*sum(cens) +
+        sum( cens*(X%*%bet + alph*tempo)) -
+        sum( cens*log( 1 + exp(X%*%bet + alph*tempo)) ) - 
+        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/alph)*log( (1 + exp(X%*%bet + alph*tempo))/(1 + exp(X%*%bet)) )) ) )
+    
+    return(-aux2)
+}
+
+# GTDL Gamma Survival Model
+sobrevGTDLg <- function(x, par) {
+    
+    alph <- par[1]
+    lambd <- par[2]
+    thet <- par[3]
+    bet <- par[4:length(par)]
+    tempo <- x$tempo
+    X <- as.matrix(x[, 2:ncol(x)])
+    st <- (1 + ( (lambd*thet/alph)*log( (1+ exp(X%*%bet + alph*tempo))/(1 + exp(X%*%bet))) ) )^(-1/thet)
+    return(st)
+}
+
+
+
+# Aplication Model 1 ------------------------------------------------------
+
+
+# parameter estimation of GTDL Gamma
+emvg <- optim(par=c(0.1,0.5,0.5,0.1), veroGTDLg, x=data, hessian = TRUE)
+egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
+
+# estimated Kaplan-Meier curve with query covariate
+# curva de Kaplan-Meier estimada com covariável de consulta
+ekm <- survfit(Surv(time = tempo_pag, event = status) ~ consulta, data = data)
+ekm_df <- data.frame(tempo = ekm$time,
+                     km = ekm$surv,
+                     consulta = c(rep(0,44),rep(1,61)) )
+
+# GTDL survival curve estimation
+# estimação da curva de sobrevivência GTDL
+ekm_df$gtdlg <- sobrevGTDLg(x = ekm_df[,c(1,3)], par = egpar)
+
+# Graph of survival curves by Kaplan Meyer (KM) and GTDL
+# Gráfico das curvas de sobrevivência por Kaplan Meyer (KM) e por GTDL
+ggplot(data = ekm_df, mapping = aes(tempo, gtdlg)) +
+    geom_line(aes(linetype = as.factor(consulta))) +
+    geom_line(aes(x = tempo, y = km, color = as.factor(consulta))) +
+    labs(x = "Tempos", y = "S(t)", color = "Consulta por KM", linetype = "Consulta por GTDL Gama") +
+    scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"), values = c(2,4)) +
+    scale_linetype_manual(labels = c("0 - Com consulta", "1 - Sem consulta"), values = c(1,2)) +
+    ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
+    theme_classic() + 
+    theme(legend.position = c(0.8,0.7),
+          legend.background = element_rect(color = "white"))
+
+
+
 # Modeling ----------------------------------------------------------------
 
 
