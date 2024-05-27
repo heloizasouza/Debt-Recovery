@@ -152,29 +152,29 @@ ggplot(data = ekm_df, mapping = aes(tempo, gtdlg)) +
 sd <- sqrt(diag(solve(emvg$hessian)))
 
 ic_alpha <- numeric()
-ic_alpha[1] <- epar[1] -qnorm(0.975)*sd[1]
-ic_alpha[2] <- epar[1] +qnorm(0.975)*sd[1]
-ic_alpha
+ic_alpha[1] <- egpar[1] -qnorm(0.975)*sd[1]
+ic_alpha[2] <- egpar[1] +qnorm(0.975)*sd[1]
+round(ic_alpha,3)
 
 # desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = epar[4], cov = solve(emvg$hessian)[2,2])
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[2], cov = solve(emvg$hessian)[2,2])
 ic_lambda <- numeric()
-ic_lambda[1] <- epar[2] -qnorm(0.975)*sd
-ic_lambda[2] <- epar[2] +qnorm(0.975)*sd
-ic_lambda
+ic_lambda[1] <- egpar[2] -qnorm(0.975)*sd
+ic_lambda[2] <- egpar[2] +qnorm(0.975)*sd
+round(ic_lambda,3)
 
 # desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = epar[5], cov = solve(emvg$hessian)[3,3])
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
 ic_theta <- numeric()
-ic_theta[1] <- epar[3] -qnorm(0.975)*sd
-ic_theta[2] <- epar[3] +qnorm(0.975)*sd
-ic_theta
+ic_theta[1] <- egpar[3] -qnorm(0.975)*sd
+ic_theta[2] <- egpar[3] +qnorm(0.975)*sd
+round(ic_theta,3)
 
 sd <- sqrt(diag(solve(emvg$hessian)))
 ic_beta1g <- numeric()
-ic_beta1g[1] <- epar[4] -qnorm(0.975)*sd[4]
-ic_beta1g[2] <- epar[4] +qnorm(0.975)*sd[4]
-ic_beta1g
+ic_beta1g[1] <- egpar[4] -qnorm(0.975)*sd[4]
+ic_beta1g[2] <- egpar[4] +qnorm(0.975)*sd[4]
+round(ic_beta1g,3)
 
 
 
@@ -371,38 +371,38 @@ sd <- c(sd0,sdg); sd
 ic_beta00 <- numeric()
 ic_beta00[1] <- epar[1] -qnorm(0.975)*sd[1]
 ic_beta00[2] <- epar[1] +qnorm(0.975)*sd[1]
-ic_beta00
+round(ic_beta00,3)
 
 ic_beta10 <- numeric()
 ic_beta10[1] <- epar[2] -qnorm(0.975)*sd[2]
 ic_beta10[2] <- epar[2] +qnorm(0.975)*sd[2]
-ic_beta10
+round(ic_beta10,3)
 
 ic_alpha <- numeric()
 ic_alpha[1] <- epar[3] -qnorm(0.975)*sd[3]
 ic_alpha[2] <- epar[3] +qnorm(0.975)*sd[3]
-ic_alpha
+round(ic_alpha,3)
 
 
 # desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = epar[4], cov = solve(emvg$hessian)[2,2])
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[2], cov = solve(emvg$hessian)[2,2])
 ic_lambda <- numeric()
 ic_lambda[1] <- epar[4] -qnorm(0.975)*sd
 ic_lambda[2] <- epar[4] +qnorm(0.975)*sd
-ic_lambda
+round(ic_lambda,3)
 
 # desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = epar[5], cov = solve(emvg$hessian)[3,3])
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
 ic_theta <- numeric()
 ic_theta[1] <- epar[5] -qnorm(0.975)*sd
 ic_theta[2] <- epar[5] +qnorm(0.975)*sd
-ic_theta
+round(ic_theta,3)
 
 sd <- c(sd0,sdg)
 ic_beta1g <- numeric()
 ic_beta1g[1] <- epar[6] -qnorm(0.975)*sd[6]
 ic_beta1g[2] <- epar[6] +qnorm(0.975)*sd[6]
-ic_beta1g
+round(ic_beta1g,3)
 
 
 
@@ -482,7 +482,7 @@ emv0 <- optim(par=c(2,1), veroZerov2, x=data0, hessian = TRUE)
 e0par <- c(emv0$par[1], emv0$par[2])
 
 # combinando os parâmetros estimados
-epar <- c(e0par, egpar)
+epar <- c(e0par, egpar); epar
 
 # estimated Kaplan-Meier curve with query covariate
 # curva de Kaplan-Meier estimada com covariável de consulta
@@ -518,35 +518,39 @@ sd <- c(sd0,sdg); sd
 ic_beta00 <- numeric()
 ic_beta00[1] <- epar[1] -qnorm(0.975)*sd[1]
 ic_beta00[2] <- epar[1] +qnorm(0.975)*sd[1]
-ic_beta00
+round(ic_beta00,3)
 
 ic_beta10 <- numeric()
 ic_beta10[1] <- epar[2] -qnorm(0.975)*sd[2]
 ic_beta10[2] <- epar[2] +qnorm(0.975)*sd[2]
-ic_beta10
+round(ic_beta10,3)
 
-ic_alpha <- numeric()
-ic_alpha[1] <- epar[3] -qnorm(0.975)*sd[3]
-ic_alpha[2] <- epar[3] +qnorm(0.975)*sd[3]
-ic_alpha
+ic_alpha0 <- numeric()
+ic_alpha0[1] <- epar[3] -qnorm(0.975)*sd[3]
+ic_alpha0[2] <- epar[3] +qnorm(0.975)*sd[3]
+round(ic_alpha0,3)
 
+ic_alpha1 <- numeric()
+ic_alpha1[1] <- epar[4] -qnorm(0.975)*sd[4]
+ic_alpha1[2] <- epar[4] +qnorm(0.975)*sd[4]
+round(ic_alpha1,3)
 
 # desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = epar[4], cov = solve(emvg$hessian)[2,2])
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
 ic_lambda <- numeric()
-ic_lambda[1] <- epar[4] -qnorm(0.975)*sd
-ic_lambda[2] <- epar[4] +qnorm(0.975)*sd
-ic_lambda
+ic_lambda[1] <- epar[5] -qnorm(0.975)*sd
+ic_lambda[2] <- epar[5] +qnorm(0.975)*sd
+round(ic_lambda,3)
 
 # desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = epar[5], cov = solve(emvg$hessian)[3,3])
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[4], cov = solve(emvg$hessian)[4,4])
 ic_theta <- numeric()
-ic_theta[1] <- epar[5] -qnorm(0.975)*sd
-ic_theta[2] <- epar[5] +qnorm(0.975)*sd
-ic_theta
+ic_theta[1] <- epar[6] -qnorm(0.975)*sd
+ic_theta[2] <- epar[6] +qnorm(0.975)*sd
+round(ic_theta,3)
 
 sd <- c(sd0,sdg)
 ic_beta1g <- numeric()
-ic_beta1g[1] <- epar[6] -qnorm(0.975)*sd[6]
-ic_beta1g[2] <- epar[6] +qnorm(0.975)*sd[6]
-ic_beta1g
+ic_beta1g[1] <- epar[7] -qnorm(0.975)*sd[7]
+ic_beta1g[2] <- epar[7] +qnorm(0.975)*sd[7]
+round(ic_beta1g,3)
