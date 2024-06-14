@@ -1119,6 +1119,66 @@ round(ic_beta1,3);round(epar[8],3);round(sd[8],3)
 
 
 
+
+# Adequação do Modelo -----------------------------------------------------
+
+
+# Resíduo de Cox-Snell para o Modelo GTDL Gamma Zero Inflacionado
+residuo <- function(x, par) {
+    
+    # parâmetros estimados
+    gamm0 <- par[1:3]
+    alph <- par[4:5]
+    lambd <- par[6]
+    thet <- par[7]
+    bet <- par[8:length(par)]
+    # covariáveis
+    tempo <- x$tempo
+    X <- as.matrix(x[, 3])
+    auX <- as.matrix(x[, 2:3])
+    X0 <- matrix(data = c(rep(1,nrow(x)),auX), nrow = nrow(x), ncol = ncol(x))
+    xalpha <- matrix(c(rep(1,nrow(X)),X), ncol = 2)
+    # resíduo estimado
+    ei = log(1 + exp(X0%*%gamm0)) + (1/thet)*log(1 + ( (lambd*thet/(xalpha%*%alph)) * log( (1 + exp((xalpha%*%alph)*tempo + X%*%bet) )/(1 + exp(X%*%bet))) ))
+    
+    return(ei)
+}
+
+data <- dados[,c(2,3,6)]; colnames(data) <- c("tempo","consulta","tipoDiv")
+ei <- residuo(data, epar)
+
+df_residuo <- data.frame(tempo = data$tempo,
+                         residuo = ei,
+                         cens = dados$status,
+                         res_exp = exp(-ei))
+ekm <- survfit(Surv(time = residuo, event = cens) ~ 1, data = df_residuo)
+ekm_df <- data.frame(km = ekm$surv, ei = ekm$time,
+                          sobre_exp_ei = exp(-ekm$time))
+
+# gráfico de adequação 1
+ggplot(data = ekm_df, aes(x = ei, y = km)) +
+    geom_line(aes(linetype = "solid")) + 
+    geom_line(aes(x = residuo, y = res_exp,  linetype = "dashed"), data = df_residuo) +
+    labs(x = "Resíduos", y = "S(t) estimada", linetype = "Curvas de Sobrevivência") +
+    scale_linetype_manual(labels = c("Kaplan-Meier","Modelo Exponencial Padrão"),
+                          values = c("solid","dashed")) +
+    ylim(0:1) + theme_classic() + 
+    theme(legend.position = c(0.75,0.7),
+          legend.background = element_rect(color = "white"))
+
+
+# gráfico de adequação 2
+ggplot(data = ekm_df, aes(x = km, y = sobre_exp_ei)) +
+    geom_point() +
+    geom_abline(aes(intercept = 0, slope = 1)) +
+    xlim(0,1) + ylim(0,1) +
+    theme_classic() + 
+    theme(legend.position = c(0.75,0.7),
+          legend.background = element_rect(color = "white"))
+
+
+
+
 # AIC e BIC --------------------------------------------
 
 
