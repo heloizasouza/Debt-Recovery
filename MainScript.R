@@ -9,9 +9,6 @@ library(msm) # pacote pra usar o método delta
 # Load and Treatment Data -------------------------------------------------
 
 dados <- read.table(file = "dados_censura_versao4.txt", header = TRUE)
-data0 <- data.frame(status = dados$status,
-                    tempo = dados$tempo,
-                    interc = rep(1,nrow(dados)))
 
 
 # Descriptive Analysis ------------------------------------------------------
@@ -70,15 +67,18 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
 # estimated Kaplan-Meier curve with query covariate
 # curva de Kaplan-Meier estimada com COVARIÁVEL DE CONSULTA
 ekm <- survfit(Surv(time = tempo, event = status) ~ x1, data = dados)
-ekm_df <- data.frame(tempo = c(0,0, ekm$time), km = c(1,1, ekm$surv), 
-                     covar = c(0,1, rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
+# ekm_df <- data.frame(tempo = c(0,0, ekm$time), km = c(1,1, ekm$surv), 
+#                      covar = c(0,1, rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
+ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
+                     covar = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
+
 
 ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
     geom_step(aes(color = as.factor(covar))) + 
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
          color = "Informação de Consulta") +
     scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
-                       values = c(2,3)) +
+                       values = c("red","blue")) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
     theme_light() + 
     theme(legend.position = c(0.8,0.8),
@@ -91,25 +91,29 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
          color = "Informação de Consulta") +
     scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
-                       values = c(2,3)) +
+                       values = c("red","blue")) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
     theme_light() + 
     theme(legend.position = c(0.8,0.8),
           legend.background = element_rect(color = "white"))
 
+LogRankX1 = survdiff(formula = Surv(tempo, status)~factor(x1), data = dados, rho=0)
+LogRankX1
 
 # estimated Kaplan-Meier curve with query covariate
 # curva de Kaplan-Meier estimada com COVARIÁVEL DE TIPO DE DIVIDA
 ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = dados)
-ekm_df <- data.frame(tempo = c(0,0, ekm$time), km = c(1,1, ekm$surv), 
-                     covar = c(0,1, rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
+# ekm_df <- data.frame(tempo = c(0,0, ekm$time), km = c(1,1, ekm$surv), 
+#                      covar = c(0,1, rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
+ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
+                     covar = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
 
 ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
     geom_step(aes(color = as.factor(covar))) + 
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
-         color = "Origem da Dívida") +
+         color = "Tipo de Dívida") +
     scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                       values = c(2,3)) +
+                       values = c("red","blue")) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
     theme_light() + 
     theme(legend.position = c(0.8,0.8),
@@ -122,12 +126,16 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)",
          color = "Tipo de Dívida") +
     scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                       values = c(2,4)) +
+                       values = c("red","blue")) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
     theme_classic() + 
     theme(legend.position = c(0.8,0.8),
           legend.background = element_rect(color = "white"))
 
+LogRankX4 = survdiff(formula = Surv(tempo, status)~factor(x4), data = dados, rho=0)
+LogRankX4
+
+#ggpubr::ggarrange(g1,g2)
 
 
 # Model 1 GTDL Gamma ------------------------------------------------------
@@ -142,9 +150,9 @@ veroGTDLg <- function(x, par) {
     bet <- par[4:length(par)]
     
     # covariates
-    X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
-    cens <- x[x$tempo > 0,1]
-    tempo <- x[x$tempo > 0,2]
+    X <- as.matrix(x[, 3:ncol(x)])
+    cens <- x[,1]
+    tempo <- x[,2]
     
     # model
     aux2 <- log(lambd)*sum(cens) +
@@ -162,7 +170,7 @@ sobrevGTDLg <- function(x, par) {
     lambd <- par[2]
     thet <- par[3]
     bet <- par[4:length(par)]
-    tempo <- x$tempo
+    tempo <- x[,1]
     X <- as.matrix(x[, 2:ncol(x)])
     st <- (1 + ( (lambd*thet/alph)*log( (1+ exp(X%*%bet + alph*tempo))/(1 + exp(X%*%bet))) ) )^(-1/thet)
     return(st)
@@ -175,7 +183,6 @@ sobrevGTDLg <- function(x, par) {
 
 # QUERY VARIABLE
 # VARIÁVEL CONSULTA
-
 data <- dados[dados$tempo > 0,1:3]
 #data$tempo[data$tempo == 0] <- 10^-3
 
@@ -186,29 +193,30 @@ egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
 # estimated Kaplan-Meier curve with query covariate
 # curva de Kaplan-Meier estimada com covariável de consulta
 ekm <- survfit(Surv(time = tempo, event = status) ~ x1, data = data)
-plot(ekm)
 ekm_df <- data.frame(tempo = ekm$time,
                      km = ekm$surv,
-                     consulta = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
-
-
+                     covar = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
 
 # GTDL survival curve estimation
 # estimação da curva de sobrevivência GTDL
-ekm_df$gtdlg <- sobrevGTDLg(x = ekm_df[,c(1,3)], par = egpar)
+gtdl_df <- data.frame(tempo = rep(seq(1,60,1),2),
+                      covar = c(rep(0,60),rep(1,60)))
+gtdl_df$surv <- sobrevGTDLg(x = gtdl_df, par = egpar)
+
 
 # Graph of survival curves by Kaplan Meyer (KM) and GTDL
-# Gráfico das curvas de sobrevivência por Kaplan Meyer (KM) e por GTDL ggplot(data = ekm_df, mapping = aes(tempo, gtdlg)) +
-    geom_line(aes(linetype = as.factor(consulta))) +
-    geom_line(aes(x = tempo, y = km, color = as.factor(consulta))) +
+# Gráfico das curvas de sobrevivência por Kaplan Meyer (KM) e por GTDL 
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+    geom_step(aes(color = as.factor(covar))) +
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)",
          color = "Consulta por Kaplan-Meier", linetype = "Consulta por GTDL Gama") +
     scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
-                       values = c(2,4)) +
+                       values = c("red","blue")) +
     scale_linetype_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_classic() + 
+    theme_light() + 
     theme(legend.position = c(0.8,0.7),
           legend.background = element_rect(color = "white"))
 
@@ -246,30 +254,34 @@ round(ic_beta1g,3);egpar[4];sd[4]
 # VARIABLE TYPE OF DEBT
 # VARIÁVEL TIPO DE DÍVIDA
 
-data <- dados[,c(1,2,6)]
+data <- dados[dados$tempo > 0,c(1,2,6)]
 #data$tempo[data$tempo == 0] <- 10^-3
 
 emvg <- optim(par=c(0.02, 0.5, 0.5, -1), veroGTDLg, x=data, hessian = TRUE);emvg
 egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
 
-ekm <- survfit(Surv(tempo, status) ~ x4, data = data)
-ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
-                     covar = c(rep(0,ekm$strata[[1]]),rep(1,ekm$strata[[2]])))
+ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = data)
+ekm_df <- data.frame(tempo = ekm$time,
+                     km = ekm$surv,
+                     covar = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
 
-ekm_df$gtdlg <- sobrevGTDLg(x = ekm_df[,c(1,3)], par = egpar)
+gtdl_df <- data.frame(tempo = rep(seq(1,60,1),2),
+                      covar = c(rep(0,60),rep(1,60)))
+gtdl_df$surv <- sobrevGTDLg(x = gtdl_df, par = egpar)
 
-g2 <- ggplot(data = ekm_df, mapping = aes(x = tempo, y = gtdlg)) +
-    geom_line(aes(linetype = as.factor(covar))) +
-    geom_line(aes(x=tempo, y=km, color=factor(covar))) +
+
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+    geom_step(aes(color = as.factor(covar))) +
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x="Tempo (meses)", y="Estimativa de S(t)", 
          color="Tipo de Dívida por Kaplan-Meier",
          linetype="Tipo de Dívida por GTDL Gama") +
     scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                       values = c(2,4)) +
+                       values = c("red","blue")) +
     scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_classic() + 
+    theme_light() + 
     theme(legend.position = c(0.75,0.7),
           legend.background = element_rect(color = "white"))
 
