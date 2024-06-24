@@ -16,11 +16,21 @@ data0 <- data.frame(status = dados$status,
 
 # Descriptive Analysis ------------------------------------------------------
 
-# response var histogram Time until debt payment
-# histograma da var resposta Tempo até o Pagamento da dívida
-hist(data$tempo, xlab="Tempo Pagamento", 
-     main = "Histograma do Tempo de Pagamento")
+# barplot of time to fail 
+aux <- data.frame(tempo = dados$tempo[dados$tempo < 25])
+ggplot(aux, aes(x = tempo)) + 
+    geom_bar() + ylim(0,2400)
 
+
+# Kaplan-Meier estimate graphs
+
+# without covar
+resultado <- survfit(Surv(time = tempo, event = status)~1, data = dados)
+
+plot(resultado, xlim=c(0, 60), ylim=c(0, 1),
+     xlab = " Tempo (meses)", ylab = "Estimativa de S(t)", bty = "n")
+
+# with covar type of debt
 resultado <- survfit(Surv(time = tempo, event = status)~factor(x4), data = dados)
 
 plot(resultado, xlim=c(0, 60), ylim=c(0, 1),
@@ -29,13 +39,11 @@ plot(resultado, xlim=c(0, 60), ylim=c(0, 1),
 legend(7, 1,
        title="Tipo de dívida", c("0 - Banco", "1 - outros segmentos"),
        lty = c(2, 2), col = c("black", "blue"), bty = "n")
-TesteC4=survdiff(Surv(time, delta)~factor(x4), rho=0)
-TesteC4
 
 
 # estimated Kaplan-Meier curve
 # curva de Kaplan-Meier estimada
-ekm <- survfit(Surv(time = tempo, event = status) ~ 1, data = data)
+ekm <- survfit(Surv(time = tempo, event = status) ~ 1, data = dados)
 ekm_df <- data.frame(tempo = ekm$time,
                      km = ekm$surv)
 
@@ -58,31 +66,34 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
     theme(legend.position = c(0.8,0.8),
           legend.background = element_rect(color = "white"))
 
+
 # estimated Kaplan-Meier curve with query covariate
 # curva de Kaplan-Meier estimada com COVARIÁVEL DE CONSULTA
-ekm <- survfit(Surv(time = tempo, event = status) ~ consulta, data = data)
-ekm_df <- data.frame(tempo = ekm$time,
-                     km = ekm$surv,
-                     consulta = c(rep(0,44),rep(1,61)) )
+ekm <- survfit(Surv(time = tempo, event = status) ~ x1, data = dados)
+ekm_df <- data.frame(tempo = c(0,0, ekm$time), km = c(1,1, ekm$surv), 
+                     covar = c(0,1, rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
 
 ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
-    geom_step(aes(color = as.factor(consulta))) + 
-    labs(x = "Tempo", y = "S(t)", color = "Consulta") +
+    geom_step(aes(color = as.factor(covar))) + 
+    labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
+         color = "Informação de Consulta") +
+    scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
+                       values = c(2,3)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
-    theme_bw() + 
+    theme_light() + 
     theme(legend.position = c(0.8,0.8),
           legend.background = element_rect(color = "white"))
 
 # smoothed graphic
 # gráfico alisado
 ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
-    geom_line(aes(color = as.factor(consulta))) + 
-    labs(x = "Tempo (meses)", y = "Estimativa de S(t)",
-         color = "Inform. Consulta") +
+    geom_line(aes(color = as.factor(covar))) + 
+    labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
+         color = "Informação de Consulta") +
     scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
-                       values = c(2,4)) +
+                       values = c(2,3)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
-    theme_classic() + 
+    theme_light() + 
     theme(legend.position = c(0.8,0.8),
           legend.background = element_rect(color = "white"))
 
@@ -90,17 +101,17 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
 # estimated Kaplan-Meier curve with query covariate
 # curva de Kaplan-Meier estimada com COVARIÁVEL DE TIPO DE DIVIDA
 ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = dados)
-ekm_df <- data.frame(tempo = ekm$time,
-                     km = ekm$surv,
-                     covar = c(rep(0,61),rep(1,61)) )
+ekm_df <- data.frame(tempo = c(0,0, ekm$time), km = c(1,1, ekm$surv), 
+                     covar = c(0,1, rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
 
 ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
     geom_step(aes(color = as.factor(covar))) + 
-    labs(x = "Tempo", y = "S(t)", color = "Tipo de Dívida") +
+    labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
+         color = "Origem da Dívida") +
     scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                       values = c(2,4)) +
+                       values = c(2,3)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
-    theme_bw() + 
+    theme_light() + 
     theme(legend.position = c(0.8,0.8),
           legend.background = element_rect(color = "white"))
 
@@ -165,7 +176,7 @@ sobrevGTDLg <- function(x, par) {
 # QUERY VARIABLE
 # VARIÁVEL CONSULTA
 
-data <- dados[,1:3]
+data <- dados[dados$tempo > 0,1:3]
 #data$tempo[data$tempo == 0] <- 10^-3
 
 # parameter estimation of GTDL Gamma
@@ -175,17 +186,19 @@ egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
 # estimated Kaplan-Meier curve with query covariate
 # curva de Kaplan-Meier estimada com covariável de consulta
 ekm <- survfit(Surv(time = tempo, event = status) ~ x1, data = data)
+plot(ekm)
 ekm_df <- data.frame(tempo = ekm$time,
                      km = ekm$surv,
-                     consulta = c(rep(0,44),rep(1,61)) )
+                     consulta = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
+
+
 
 # GTDL survival curve estimation
 # estimação da curva de sobrevivência GTDL
 ekm_df$gtdlg <- sobrevGTDLg(x = ekm_df[,c(1,3)], par = egpar)
 
 # Graph of survival curves by Kaplan Meyer (KM) and GTDL
-# Gráfico das curvas de sobrevivência por Kaplan Meyer (KM) e por GTDL
-g1 <- ggplot(data = ekm_df, mapping = aes(tempo, gtdlg)) +
+# Gráfico das curvas de sobrevivência por Kaplan Meyer (KM) e por GTDL ggplot(data = ekm_df, mapping = aes(tempo, gtdlg)) +
     geom_line(aes(linetype = as.factor(consulta))) +
     geom_line(aes(x = tempo, y = km, color = as.factor(consulta))) +
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)",
@@ -888,7 +901,8 @@ round(ic_beta1g,3);round(epar[7],3);round(sd[7],3)
 data <- dados[,c(1,2,6)]
 data0$covar <- data[,3]
 
-emvg <- optim(par=c(0.1, 0.5, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE);emvg
+emvg <- optim(par=c(-0.1, -0.1, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE, method = "BFGS");emvg
+#emvg <- optim(par=c(0.1, 0.5, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE);emvg
 egpar <- c(emvg$par[1], emvg$par[2], exp(emvg$par[3]), exp(emvg$par[4]), emvg$par[5])
 
 emv0 <- optim(par=c(2,1), veroZerov2, x=data0, hessian = TRUE);emv0
