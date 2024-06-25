@@ -210,14 +210,14 @@ ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
     geom_step(aes(color = as.factor(covar))) +
     geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)",
-         color = "Consulta por Kaplan-Meier", linetype = "Consulta por GTDL Gama") +
+         color = "Inform. Consulta por Kaplan-Meier", linetype = "Inform. Consulta por GTDL Gama") +
     scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
                        values = c("red","blue")) +
     scale_linetype_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
     theme_light() + 
-    theme(legend.position = c(0.8,0.7),
+    theme(legend.position = c(0.7,0.7),
           legend.background = element_rect(color = "white"))
 
 
@@ -270,7 +270,7 @@ gtdl_df <- data.frame(tempo = rep(seq(1,60,1),2),
 gtdl_df$surv <- sobrevGTDLg(x = gtdl_df, par = egpar)
 
 
-ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+g2=ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
     geom_step(aes(color = as.factor(covar))) +
     geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x="Tempo (meses)", y="Estimativa de S(t)", 
@@ -282,7 +282,7 @@ ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
     theme_light() + 
-    theme(legend.position = c(0.75,0.7),
+    theme(legend.position = c(0.7,0.7),
           legend.background = element_rect(color = "white"))
 
 ggpubr::ggarrange(g1,g2)
@@ -380,27 +380,30 @@ ep0par <- c(emvp0$par[1], emvp0$par[2], exp(emvp0$par[3]), exp(emvp0$par[4]), em
 ekm <- survfit(Surv(time = tempo, event = status) ~ x1, data = data)
 ekm_df <- data.frame(tempo = ekm$time,
                      km = ekm$surv,
-                     consulta = c(rep(0,44),rep(1,61)) )
+                     consulta = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
 
 # GTDL survival curve estimation
 # estimação da curva de sobrevivência GTDL
-ekm_df$gtdlp0 <- sobrevGTDLp0(x = ekm_df[,c(1,3)], par = ep0par)
+gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
+                      covar = c(rep(0,61),rep(1,61)))
+gtdl_df$surv <- sobrevGTDLp0(x = gtdl_df, par = ep0par)
+
 
 # Graph of survival curves by Kaplan Meyer (KM) and GTDL
 # Gráfico das curvas de sobrevivência por Kaplan Meyer (KM) e por GTDL
-g1 <- ggplot(data = ekm_df, mapping = aes(tempo, gtdlp0[,1])) +
-    geom_line(aes(linetype = as.factor(consulta))) +
-    geom_line(aes(x = tempo, y = km, color = as.factor(consulta))) +
-    labs(x = "Tempo (meses)", y = "Estimativa de S(t)",
-         color = "Consulta por Kaplan-Meier",
-         linetype = "Consulta por GTDL Gama p0") +
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+    geom_step(aes(color = as.factor(consulta))) +
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
+    labs(x="Tempo (meses)", y="Estimativa de S(t)", 
+         color="Inform. Consulta por Kaplan-Meier",
+         linetype="Inform. Consulta por GTDL Gama p0") +
     scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
-                       values = c(2,4)) +
+                       values = c("red","blue")) +
     scale_linetype_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_classic() + 
-    theme(legend.position = c(0.8,0.7),
+    theme_light() + 
+    theme(legend.position = c(0.7,0.7),
           legend.background = element_rect(color = "white"))
 
 
@@ -448,26 +451,34 @@ data <- dados[,c(1,2,6)]
 emvp0 <- optim(par=c(0.25,0.1,-0.5,-0.5,0.1), veroGTDLp0, x=data, hessian = TRUE);emvp0
 ep0par <- c(emvp0$par[1], emvp0$par[2], exp(emvp0$par[3]), exp(emvp0$par[4]), emvp0$par[5])
 
-ekm <- survfit(Surv(tempo, status) ~ x4, data = data)
-ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
-                     covar = c(rep(0,ekm$strata[[1]]),rep(1,ekm$strata[[2]])))
+ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = data)
+ekm_df <- data.frame(tempo = ekm$time,
+                     km = ekm$surv,
+                     consulta = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
 
-ekm_df$gtdlp0 <- sobrevGTDLp0(x = ekm_df[,c(1,3)], par = ep0par)
+# GTDL survival curve estimation
+# estimação da curva de sobrevivência GTDL
+gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
+                      covar = c(rep(0,61),rep(1,61)))
+gtdl_df$surv <- sobrevGTDLp0(x = gtdl_df, par = ep0par)
 
-g2 <- ggplot(data = ekm_df, mapping = aes(x = tempo, y = gtdlp0)) +
-    geom_line(aes(linetype = as.factor(covar))) +
-    geom_line(aes(x=tempo, y=km, color=factor(covar))) +
+
+g2=ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+    geom_step(aes(color = as.factor(consulta))) +
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x="Tempo (meses)", y="Estimativa de S(t)", 
          color="Tipo de Dívida por Kaplan-Meier",
          linetype="Tipo de Dívida por GTDL Gama p0") +
     scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                       values = c(2,4)) +
+                       values = c("red","blue")) +
     scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_classic() + 
-    theme(legend.position = c(0.75,0.7),
+    theme_light() + 
+    theme(legend.position = c(0.7,0.7),
           legend.background = element_rect(color = "white"))
+
+
 
 ggpubr::ggarrange(g1,g2)
 
@@ -518,7 +529,7 @@ round(ic_beta1g,3);round(ep0par[5],3);round(sd[5],3)
 
 # likelihood of zero inflation
 # verossimilhança da inflação de zeros
-veroZerov1 <- function(x, beta) {
+veroZero <- function(x, beta) {
     
     # covariates
     X0 <- as.matrix(x[x$tempo == 0, 3:ncol(x)])
@@ -579,7 +590,10 @@ sobrevGTDLv1 <- function(x, par) {
 # VARIÁVEL CONSULTA
 
 data <- dados[,1:3]
-data0$covar <- data[,3]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    consulta = dados$x1)
 
 # parameter estimation of GTDL Gamma
 # estimação dos parâmetros do GTDL Gamma
@@ -588,7 +602,7 @@ egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
 
 # parameter estimation of zero inflation
 # estimação dos parâmetros da inflação de zeros
-emv0 <- optim(par=c(-0.5, 0.5), veroZerov1, x=data0, hessian = TRUE);emv0
+emv0 <- optim(par=c(-0.5, 0.5), veroZero, x=data0, hessian = TRUE);emv0
 e0par <- c(emv0$par[1], emv0$par[2])
 
 # combinando os parâmetros estimados
@@ -603,23 +617,26 @@ ekm_df <- data.frame(tempo = ekm$time,
 
 # GTDL survival curve estimation
 # estimação da curva de sobrevivência GTDL
-ekm_df$gtdl <- sobrevGTDLv1(x = ekm_df[,c(1,3)], par = epar)
+gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
+                      covar = c(rep(0,61),rep(1,61)))
+gtdl_df$surv <- sobrevGTDLv1(x = gtdl_df, par = epar)
+
 
 # Graph of survival curves by Kaplan Meyer (KM) and GTDL
 # Gráfico das curvas de sobrevivência por Kaplan Meyer (KM) e por GTDL
-g1 <- ggplot(data = ekm_df, mapping = aes(tempo, gtdl)) +
-    geom_line(aes(linetype = as.factor(consulta))) +
-    geom_line(aes(x = tempo, y = km, color = as.factor(consulta))) +
-    labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
-         color = "Consulta por Kaplan-Meier", 
-         linetype = "Consulta por GTDL \nZero Inflacionado v1") +
-    scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"), 
-                       values = c(2,4)) +
-    scale_linetype_manual(labels = c("0 - Com consulta", "1 - Sem consulta"), 
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+    geom_step(aes(color = as.factor(consulta))) +
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
+    labs(x="Tempo (meses)", y="Estimativa de S(t)", 
+         color="Inform. Consulta por Kaplan-Meier",
+         linetype="Inform. Consulta por GTDL \nZero Inflacionado") +
+    scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
+                       values = c("red","blue")) +
+    scale_linetype_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_classic() + 
-    theme(legend.position = c(0.8,0.7),
+    theme_light() + 
+    theme(legend.position = c(0.7,0.7),
           legend.background = element_rect(color = "white"))
 
 
@@ -671,12 +688,15 @@ round(ic_beta1g,3);round(epar[6],3);round(sd[6],3)
 # VARIÁVEL TIPO DE DÍVIDA
 
 data <- dados[,c(1,2,6)]
-data0$covar <- data[,3]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    tipoDiv = dados$x4)
 
 emvg <- optim(par=c(0.1,-0.5,-0.5,0.1), veroGTDLv1, x=data, hessian = TRUE);emvg
 egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
 
-emv0 <- optim(par=c(-0.5,0.5), veroZerov1, x=data0, hessian = TRUE);emv0
+emv0 <- optim(par=c(-0.5,0.5), veroZero, x=data0, hessian = TRUE);emv0
 e0par <- c(emv0$par[1], emv0$par[2])
 
 epar <- c(e0par, egpar); epar
@@ -686,20 +706,24 @@ ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv,
                      covar = c(rep(0,ekm$strata[[1]]),rep(1,ekm$strata[[2]])))
 
 ekm_df$gtdl0 <- sobrevGTDLv1(ekm_df[,c(1,3)],epar)
+gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
+                      covar = c(rep(0,61),rep(1,61)))
+gtdl_df$surv <- sobrevGTDLv1(x = gtdl_df, par = epar)
 
-g2 <- ggplot(data = ekm_df, mapping = aes(x = tempo, y = gtdl0)) +
-    geom_line(aes(linetype = as.factor(covar))) +
-    geom_line(aes(x=tempo, y=km, color=factor(covar))) +
+
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+    geom_step(aes(color = as.factor(covar))) +
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x="Tempo (meses)", y="Estimativa de S(t)", 
          color="Tipo de Dívida por Kaplan-Meier",
-         linetype="Tipo de Dívida por GTDL \nZero Inflacionado v1") +
-    scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"), 
-                       values = c(2,4)) +
-    scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"), 
+         linetype="Tipo de Dívida por GTDL \nZero Inflacionado") +
+    scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
+                       values = c("red","blue")) +
+    scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_classic() + 
-    theme(legend.position = c(0.75,0.7),
+    theme_light() + 
+    theme(legend.position = c(0.7,0.7),
           legend.background = element_rect(color = "white"))
 
 ggpubr::ggarrange(g1,g2)
@@ -752,7 +776,7 @@ round(ic_beta1g,3);round(epar[6],3);round(sd[6],3)
 
 # likelihood of zero inflation
 # verossimilhança da inflação de zeros
-veroZerov2 <- function(x, beta) {
+veroZero <- function(x, beta) {
     
     # covariates
     X0 <- as.matrix(x[x$tempo == 0, 3:ncol(x)])
@@ -815,16 +839,19 @@ sobrevGTDLv2 <- function(x, par) {
 # VARIÁVEL CONSULTA
 
 data <- dados[,1:3]
-data0$covar <- data[,3]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    consulta = dados$x1)
 
 # parameter estimation of GTDL Gamma
 # estimação dos parâmetros do GTDL Gamma
-emvg <- optim(par=c(0.1, 0.5, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE);emvg
+emvg <- optim(par=c(-0.1, -0.1, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE, method = "BFGS");emvg
 egpar <- c(emvg$par[1], emvg$par[2], exp(emvg$par[3]), exp(emvg$par[4]), emvg$par[5])
 
 # parameter estimation of zero inflation
 # estimação dos parâmetros da inflação de zeros
-emv0 <- optim(par=c(2, 1), veroZerov2, x=data0, hessian = TRUE);emv0
+emv0 <- optim(par=c(2, 1), veroZero, x=data0, hessian = TRUE);emv0
 e0par <- c(emv0$par[1], emv0$par[2])
 
 # combinando os parâmetros estimados
@@ -835,27 +862,29 @@ epar <- c(e0par, egpar); epar
 ekm <- survfit(Surv(time = tempo, event = status) ~ x1, data = data)
 ekm_df <- data.frame(tempo = ekm$time,
                      km = ekm$surv,
-                     consulta = c(rep(0,44),rep(1,61)) )
+                     consulta = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
 
 # GTDL survival curve estimation
 # estimação da curva de sobrevivência GTDL
-ekm_df$gtdl <- sobrevGTDLv2(x = ekm_df[,c(1,3)], par = epar)
+gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
+                      covar = c(rep(0,61),rep(1,61)))
+gtdl_df$surv <- sobrevGTDLv2(x = gtdl_df, par = epar)
 
 # Graph of survival curves by Kaplan Meyer (KM) and GTDL
 # Gráfico das curvas de sobrevivência por Kaplan Meyer (KM) e por GTDL
-g1 <- ggplot(data = ekm_df, mapping = aes(tempo, gtdl)) +
-    geom_line(aes(linetype = as.factor(consulta))) +
-    geom_line(aes(x = tempo, y = km, color = as.factor(consulta))) +
+g1=ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) + 
+    geom_step(aes(color = as.factor(consulta))) + 
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)",
          color = "Consulta por Kaplan-Meier",
-         linetype = "Consulta por GTDL \nZero Inflacionado v2") +
+         linetype = "Consulta por GTDL \nZero Inflacionado") +
     scale_color_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
-                       values = c(2,4)) +
+                       values = c("red", "blue")) +
     scale_linetype_manual(labels = c("0 - Com consulta", "1 - Sem consulta"),
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_classic() + 
-    theme(legend.position = c(0.8,0.7),
+    theme_light() + 
+    theme(legend.position = c(0.7,0.7),
           legend.background = element_rect(color = "white"))
 
 
@@ -911,13 +940,16 @@ round(ic_beta1g,3);round(epar[7],3);round(sd[7],3)
 # VARIÁVEL TIPO DE DÍVIDA
 
 data <- dados[,c(1,2,6)]
-data0$covar <- data[,3]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    consulta = dados$x4)
 
 emvg <- optim(par=c(-0.1, -0.1, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE, method = "BFGS");emvg
 #emvg <- optim(par=c(0.1, 0.5, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE);emvg
 egpar <- c(emvg$par[1], emvg$par[2], exp(emvg$par[3]), exp(emvg$par[4]), emvg$par[5])
 
-emv0 <- optim(par=c(2,1), veroZerov2, x=data0, hessian = TRUE);emv0
+emv0 <- optim(par=c(2,1), veroZero, x=data0, hessian = TRUE);emv0
 e0par <- c(emv0$par[1], emv0$par[2])
 
 epar <- c(e0par, egpar); epar
@@ -926,22 +958,25 @@ ekm <- survfit(Surv(tempo, status) ~ x4, data = data)
 ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
                      covar = c(rep(0,ekm$strata[[1]]),rep(1,ekm$strata[[2]])))
 
-ekm_df$gtdl0 <- sobrevGTDLv2(ekm_df[,c(1,3)],epar)
+gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
+                      covar = c(rep(0,61),rep(1,61)))
+gtdl_df$surv <- sobrevGTDLv2(x = gtdl_df, par = epar)
 
-g2 <- ggplot(data = ekm_df, mapping = aes(x = tempo, y = gtdl0)) +
-    geom_line(aes(linetype = as.factor(covar))) +
-    geom_line(aes(x=tempo, y=km, color=factor(covar))) +
+g2=ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) + 
+    geom_step(aes(color = as.factor(covar))) + 
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x="Tempo (meses)", y="Estimativa de S(t)", 
          color="Tipo de Dívida por Kaplan-Meier",
-         linetype="Tipo de Dívida por GTDL \nZero Inflacionado v2") +
+         linetype="Tipo de Dívida por GTDL \nZero Inflacionado") +
     scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                       values = c(2,4)) +
+                       values = c("red", "blue")) +
     scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_classic() + 
-    theme(legend.position = c(0.75,0.7),
+    theme_light() + 
+    theme(legend.position = c(0.7,0.7),
           legend.background = element_rect(color = "white"))
+
 
 ggpubr::ggarrange(g1,g2)
 
@@ -998,17 +1033,14 @@ round(ic_beta1g,3);round(epar[7],3);round(sd[7],3)
 
 # model final com covariáveis significativas
 
-
-# likelihood of zero inflation
-# verossimilhança da inflação de zeros
-veroZeroFinal <- function(x, gamm) {
+veroZero <- function(x, gamma) {
     
     # covariates
     X0 <- as.matrix(x[x$tempo == 0, 2:ncol(x)])
     X <- as.matrix(x[x$tempo > 0, 2:ncol(x)])
     
     # model
-    aux1 <- sum((X0%*%gamm)) - sum(log( 1 + exp(X0%*%gamm))) - sum(log(1 + exp(X%*%gamm)))
+    aux1 <- sum((X0%*%gamma)) - sum(log( 1 + exp(X0%*%gamma))) - sum(log(1 + exp(X%*%gamma)))
     return(-aux1)
 }
 
@@ -1017,45 +1049,24 @@ veroZeroFinal <- function(x, gamm) {
 veroGTDLFinal <- function(x, par) {
     
     # parameters
-    alph <- par[1:2]
-    lambd <- exp(par[3])
-    thet <- exp(par[4])
-    bet <- par[5:length(par)]
+    alph <- par[1]
+    lambd <- exp(par[2])
+    thet <- exp(par[3])
+    bet <- par[4]
     
     # covariates
     X <- as.matrix(x[x$tempo > 0, 3])
-    xalpha <- matrix(c(rep(1,nrow(X)),X), ncol = 2)
     cens <- x[x$tempo > 0,1]
     tempo <- x[x$tempo > 0,2]
     
     # model
     aux2 <- log(lambd)*sum(cens) +
-        sum( cens*((xalpha%*%alph)*tempo + X%*%bet)) -
-        sum( cens*log( 1 + exp((xalpha%*%alph)*tempo + X%*%bet) ) ) - 
-        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/(xalpha%*%alph))*log( (1 + exp((xalpha%*%alph)*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
+        sum( cens*(alph*tempo + X%*%bet)) -
+        sum( cens*log( 1 + exp(alph*tempo + X%*%bet) ) ) - 
+        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/alph)*log( (1 + exp(alph*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
     
     return(-aux2)
 }
-
-# GTDL Zero Gamma Inflated Survival Model
-# modelo de sobrevivência da GTDL Gama zero inflacionada
-sobrevGTDL0Final <- function(x, par) {
-    
-    gamm0 <- par[1:3]
-    alph <- par[4:5]
-    lambd <- par[6]
-    thet <- par[7]
-    bet <- par[8:length(par)]
-    tempo <- x$tempo
-    X <- as.matrix(x[, 3])
-    auX <- as.matrix(x[, 2:3])
-    X0 <- matrix(data = c(rep(1,nrow(x)),auX), nrow = nrow(x), ncol = ncol(x))
-    xalpha <- matrix(c(rep(1,nrow(X)),X), ncol = 2)
-    st <- (1/(1 + exp(X0%*%gamm0) )) * (1 + ( (lambd*thet/(xalpha%*%alph)) * log( (1 + exp((xalpha%*%alph)*tempo + X%*%bet) )/(1 + exp(X%*%bet))) ) )^(-1/thet)
-    
-    return(st)
-}
-
 
 
 # Aplication Model 5 --------------------------------------------------------------
@@ -1067,29 +1078,16 @@ data0 <- data.frame(tempo = dados$tempo,interc = rep(1,nrow(dados)),
 
 # parameter estimation of zero inflation
 # estimação dos parâmetros da inflação de zeros
-emv0 <- optim(par=c(2, 1, 2), veroZeroFinal, x=data0, hessian = TRUE);emv0
+emv0 <- optim(par=c(2, 1, 2), veroZero, x=data0, hessian = TRUE);emv0
 e0par <- c(emv0$par[1], emv0$par[2], emv0$par[3])
 
 # parameter estimation of GTDL Gamma
 # estimação dos parâmetros do GTDL Gamma
-emvg <- optim(par=c(0.1, 0.5, -0.5, -0.5, 0.1), veroGTDLFinal, x=data, hessian = TRUE);emvg
-egpar <- c(emvg$par[1], emvg$par[2], exp(emvg$par[3]), exp(emvg$par[4]), emvg$par[5])
+emvg <- optim(par=c(0.1, -0.5, -0.5, 0.1), veroGTDLFinal, x=data, hessian = TRUE);emvg
+egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
 
 # combinando os parâmetros estimados
 epar <- c(e0par, egpar); epar
-
-# estimated Kaplan-Meier curve with query covariate
-# curva de Kaplan-Meier estimada com covariável de consulta
-ekm <- survfit(Surv(time = tempo, event = status) ~ x1 + x4, data = dados)
-ekm_df <- data.frame(tempo = ekm$time,
-                     km = ekm$surv,
-                     consulta = c( rep(0,32), rep(0,34), rep(1,61), rep(1,61) ),
-                     tipoDiv = c( rep(0,32), rep(1,34), rep(0,61), rep(1,61) ) )
-
-# GTDL survival curve estimation
-# estimação da curva de sobrevivência GTDL
-ekm_df$gtdl <- sobrevGTDL0Final(x = ekm_df[,c(1,3,4)], par = epar)
-
 
 # estimation of the confidence interval of the parameters
 # estimação do intervalo de confiança dos parâmetros
@@ -1112,35 +1110,30 @@ ic_gamma2[1] <- epar[3] -qnorm(0.975)*sd[3]
 ic_gamma2[2] <- epar[3] +qnorm(0.975)*sd[3]
 round(ic_gamma2,3);round(epar[3],3);round(sd[3],3)
 
-ic_alpha0 <- numeric()
-ic_alpha0[1] <- epar[4] -qnorm(0.975)*sd[4]
-ic_alpha0[2] <- epar[4] +qnorm(0.975)*sd[4]
-round(ic_alpha0,3);round(epar[4],3);round(sd[4],3)
+ic_alpha <- numeric()
+ic_alpha[1] <- epar[4] -qnorm(0.975)*sd[4]
+ic_alpha[2] <- epar[4] +qnorm(0.975)*sd[4]
+round(ic_alpha,3);round(epar[4],3);round(sd[4],3)
 
-ic_alpha1 <- numeric()
-ic_alpha1[1] <- epar[5] -qnorm(0.975)*sd[5]
-ic_alpha1[2] <- epar[5] +qnorm(0.975)*sd[5]
-round(ic_alpha1,3);round(epar[5],3);round(sd[5],3)
+# desvio padrão pelo método delta
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[2], cov = solve(emvg$hessian)[2,2])
+ic_lambda <- numeric()
+ic_lambda[1] <- epar[5] -qnorm(0.975)*sd
+ic_lambda[2] <- epar[5] +qnorm(0.975)*sd
+round(ic_lambda,3);round(epar[5],3);round(sd,2)
 
 # desvio padrão pelo método delta
 sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
-ic_lambda <- numeric()
-ic_lambda[1] <- epar[6] -qnorm(0.975)*sd
-ic_lambda[2] <- epar[6] +qnorm(0.975)*sd
-round(ic_lambda,3);round(epar[6],3);round(sd,3)
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[4], cov = solve(emvg$hessian)[4,4])
 ic_theta <- numeric()
-ic_theta[1] <- epar[7] -qnorm(0.975)*sd
-ic_theta[2] <- epar[7] +qnorm(0.975)*sd
-round(ic_theta,3);round(epar[7],3);round(sd,3)
+ic_theta[1] <- epar[6] -qnorm(0.975)*sd
+ic_theta[2] <- epar[6] +qnorm(0.975)*sd
+round(ic_theta,3);round(epar[6],3);round(sd,3)
 
 sd <- c(sd0,sdg)
 ic_beta1 <- numeric()
-ic_beta1[1] <- epar[8] -qnorm(0.975)*sd[8]
-ic_beta1[2] <- epar[8] +qnorm(0.975)*sd[8]
-round(ic_beta1,3);round(epar[8],3);round(sd[8],3)
+ic_beta1[1] <- epar[7] -qnorm(0.975)*sd[7]
+ic_beta1[2] <- epar[7] +qnorm(0.975)*sd[7]
+round(ic_beta1,3);round(epar[7],3);round(sd[7],3)
 
 
 
@@ -1154,10 +1147,10 @@ residuo <- function(x, par) {
     
     # parâmetros estimados
     gamm0 <- par[1:3]
-    alph <- par[4:5]
-    lambd <- par[6]
-    thet <- par[7]
-    bet <- par[8:length(par)]
+    alph <- par[4]
+    lambd <- par[5]
+    thet <- par[6]
+    bet <- par[7]
     # covariáveis
     tempo <- x$tempo
     X <- as.matrix(x[, 3])
@@ -1165,7 +1158,7 @@ residuo <- function(x, par) {
     X0 <- matrix(data = c(rep(1,nrow(x)),auX), nrow = nrow(x), ncol = ncol(x))
     xalpha <- matrix(c(rep(1,nrow(X)),X), ncol = 2)
     # resíduo estimado
-    ei = log(1 + exp(X0%*%gamm0)) + (1/thet)*log(1 + ( (lambd*thet/(xalpha%*%alph)) * log( (1 + exp((xalpha%*%alph)*tempo + X%*%bet) )/(1 + exp(X%*%bet))) ))
+    ei = log(1 + exp(X0%*%gamm0)) + (1/thet)*log(1 + ( (lambd*thet/alph) * log( (1 + exp(alph*tempo + X%*%bet) )/(1 + exp(X%*%bet))) ))
     
     return(ei)
 }
@@ -1188,7 +1181,7 @@ ggplot(data = ekm_df, aes(x = ei, y = km)) +
     labs(x = "Resíduos", y = "S(t) estimada", linetype = "Curvas de Sobrevivência") +
     scale_linetype_manual(labels = c("Kaplan-Meier","Modelo Exponencial Padrão"),
                           values = c("solid","dashed")) +
-    ylim(0:1) + theme_classic() + 
+    ylim(0:1) + theme_light() + 
     theme(legend.position = c(0.75,0.7),
           legend.background = element_rect(color = "white"))
 
@@ -1208,14 +1201,255 @@ ggplot(data = ekm_df, aes(x = km, y = sobre_exp_ei)) +
  # AIC e BIC --------------------------------------------
 
 
-
-
 # critérios para seleção do modelo
-lv <- -veroGTDLp0(data, ep0par)
 maic <- function(lv,k) { -2*lv + 2*k }
 mbic <- function(lv,k,n) { -2*lv + k*log(n) }
-maic(lv,5)
-mbic(lv,5,9645)
+
+
+# MODELO GTDL p0
+
+veroGTDLp0 <- function(x, par) {
+    
+    # parameters
+    p0 <- par[1]
+    alph <- par[2]
+    lambd <- exp(par[3])
+    thet <- exp(par[4])
+    bet <- par[5:length(par)]
+    n0 <- nrow(x[x$tempo == 0,])
+    n1 <- nrow(x[x$tempo > 0,])
+    
+    # covariates
+    X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
+    cens <- x[x$tempo > 0,1]
+    tempo <- x[x$tempo > 0,2]
+    
+    # model
+    aux2 <- n0*log(p0) + n1*log(1-p0) + log(lambd)*sum(cens) +
+        sum( cens*(alph*tempo + X%*%bet)) -
+        sum( cens*log( 1 + exp(alph*tempo + X%*%bet) ) ) - 
+        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/alph)*log( (1 + exp(alph*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
+    
+    return(-aux2)
+}
+# covar x1
+data <- dados[,1:3]
+emvp0 <- optim(par=c(0.5,0.1,-0.5,-0.5,0.1), veroGTDLp0, x=data, hessian = TRUE);emvp0
+maic(lv = -emvp0$value, k = 5)
+mbic(lv = -emvp0$value, k = 5, n = 9645)
+# covar x4
+data <- dados[,c(1,2,6)]
+emvp0 <- optim(par=c(0.25,0.1,-0.5,-0.5,0.1), veroGTDLp0, x=data, hessian = TRUE);emvp0
+maic(lv = -emvp0$value, k = 5)
+mbic(lv = -emvp0$value, k = 5, n = 9645)
+# covar x1 e x4
+data <- dados[,c(1:3,6)]
+emvp0 <- optim(par=c(0.25,-0.1,-0.5,-0.5,-0.1,-0.1), veroGTDLp0, x=data, hessian = TRUE);emvp0
+maic(lv = -emvp0$value, k = 6)
+mbic(lv = -emvp0$value, k = 6, n = 9645)
 
 
 
+# MODELO GTDL 0 V1
+
+veroZero <- function(x, beta) {
+    
+    # covariates
+    X0 <- as.matrix(x[x$tempo == 0, 3:ncol(x)])
+    X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
+    
+    # model
+    aux1 <- sum((X0%*%beta)) - sum(log( 1 + exp(X0%*%beta))) - sum(log(1 + exp(X%*%beta)))
+    return(-aux1)
+}
+
+veroGTDLv1 <- function(x, par) {
+    
+    # parameters
+    alph <- par[1]
+    lambd <- exp(par[2])
+    thet <- exp(par[3])
+    bet <- par[4:length(par)]
+    
+    # covariates
+    X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
+    cens <- x[x$tempo > 0,1]
+    tempo <- x[x$tempo > 0,2]
+    
+    # model
+    aux2 <- log(lambd)*sum(cens) +
+        sum( cens*(alph*tempo + X%*%bet)) -
+        sum( cens*log( 1 + exp(alph*tempo + X%*%bet) ) ) - 
+        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/alph)*log( (1 + exp(alph*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
+    
+    return(-aux2)
+}
+# covar x1
+data <- dados[,1:3]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    consulta = dados$x1)
+emvg <- optim(par=c(0.1, -0.5, -0.5, 0.1), veroGTDLv1, x=data, hessian = TRUE);emvg
+emv0 <- optim(par=c(-0.5, 0.5), veroZero, x=data0, hessian = TRUE);emv0
+maic(lv = -(emvg$value + emv0$value), k = 6)
+mbic(lv = -(emvg$value + emv0$value), k = 6, n = 9645)
+# covar x4
+data <- dados[,c(1,2,6)]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    tipoDiv = dados$x4)
+emvg <- optim(par=c(0.1,-0.5,-0.5,0.1), veroGTDLv1, x=data, hessian = TRUE);emvg
+emv0 <- optim(par=c(-0.5,0.5), veroZero, x=data0, hessian = TRUE);emv0
+maic(lv = -(emvg$value + emv0$value), k = 6)
+mbic(lv = -(emvg$value + emv0$value), k = 6, n = 9645)
+# covar x1 e x4
+data <- dados[,c(1:3,6)]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    consulta = dados$x1,
+                    tipoDiv = dados$x4)
+emvg <- optim(par=c(0.1,-0.5,-0.5,0.1,0.1), veroGTDLv1, x=data, hessian = TRUE);emvg
+emv0 <- optim(par=c(-0.5,0.5,0.1), veroZero, x=data0, hessian = TRUE);emv0
+maic(lv = -(emvg$value + emv0$value), k = 8)
+mbic(lv = -(emvg$value + emv0$value), k = 8, n = 9645)
+
+
+
+# MODELO GTDL 0 V2
+
+veroZero <- function(x, beta) {
+    
+    # covariates
+    X0 <- as.matrix(x[x$tempo == 0, 3:ncol(x)])
+    X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
+    
+    # model
+    aux1 <- sum((X0%*%beta)) - sum(log( 1 + exp(X0%*%beta))) - sum(log(1 + exp(X%*%beta)))
+    return(-aux1)
+}
+
+veroGTDLv2 <- function(x, par) {
+    
+    # parameters
+    alph <- par[1:2]
+    lambd <- exp(par[3])
+    thet <- exp(par[4])
+    bet <- par[5:length(par)]
+    
+    # covariates
+    X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
+    xalpha <- matrix(c(rep(1,nrow(X)),X), ncol = ncol(X)+1)
+    cens <- x[x$tempo > 0,1]
+    tempo <- x[x$tempo > 0,2]
+    
+    # model
+    aux2 <- log(lambd)*sum(cens) +
+        sum( cens*((xalpha%*%alph)*tempo + X%*%bet)) -
+        sum( cens*log( 1 + exp((xalpha%*%alph)*tempo + X%*%bet) ) ) - 
+        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/(xalpha%*%alph))*log( (1 + exp((xalpha%*%alph)*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
+    
+    return(-aux2)
+}
+
+# covar x1
+data <- dados[,1:3]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    consulta = dados$x1)
+emvg <- optim(par=c(-0.1, -0.1, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE, method = "BFGS");emvg
+emv0 <- optim(par=c(2, 1), veroZero, x=data0, hessian = TRUE);emv0
+maic(lv = -(emvg$value + emv0$value), k = 7)
+mbic(lv = -(emvg$value + emv0$value), k = 7, n = 9645)
+
+# covar x4
+data <- dados[,c(1,2,6)]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    tipoDiv = dados$x4)
+emvg <- optim(par=c(-0.1, -0.1, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE, method = "BFGS");emvg
+emv0 <- optim(par=c(2,1), veroZero, x=data0, hessian = TRUE);emv0
+maic(lv = -(emvg$value + emv0$value), k = 7)
+mbic(lv = -(emvg$value + emv0$value), k = 7, n = 9645)
+
+
+veroGTDLv2 <- function(x, par) {
+    # parameters
+    alph <- par[1:3]
+    lambd <- exp(par[4])
+    thet <- exp(par[5])
+    bet <- par[6:length(par)]
+    # covariates
+    X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
+    xalpha <- matrix(c(rep(1,nrow(X)),X), ncol = ncol(X)+1)
+    cens <- x[x$tempo > 0,1]
+    tempo <- x[x$tempo > 0,2]
+    # model
+    aux2 <- log(lambd)*sum(cens) +
+        sum( cens*((xalpha%*%alph)*tempo + X%*%bet)) -
+        sum( cens*log( 1 + exp((xalpha%*%alph)*tempo + X%*%bet) ) ) - 
+        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/(xalpha%*%alph))*log( (1 + exp((xalpha%*%alph)*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
+    return(-aux2)
+}
+# covar x1 e x4
+data <- dados[,c(1:3,6)]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    consulta = dados$x1,
+                    tipoDiv = dados$x4)
+emvg <- optim(par=c(-0.08,-0.13,-0.13,-0.5,-0.5,0.1,0.1), veroGTDLv2, x=data, hessian = TRUE);emvg
+emv0 <- optim(par=c(-0.5,0.5,0.1), veroZero, x=data0, hessian = TRUE);emv0
+maic(lv = -(emvg$value + emv0$value), k = 10)
+mbic(lv = -(emvg$value + emv0$value), k = 10, n = 9645)
+
+
+
+# MODELO GTDL 0 SIGNIFICATIVAS
+
+veroZero <- function(x, gamma) {
+    
+    # covariates
+    X0 <- as.matrix(x[x$tempo == 0, 2:ncol(x)])
+    X <- as.matrix(x[x$tempo > 0, 2:ncol(x)])
+    
+    # model
+    aux1 <- sum((X0%*%gamma)) - sum(log( 1 + exp(X0%*%gamma))) - sum(log(1 + exp(X%*%gamma)))
+    return(-aux1)
+}
+
+# likelihood of GTDL Gamma
+# verossimilhança da GTDL Gamma
+veroGTDLFinal <- function(x, par) {
+    
+    # parameters
+    alph <- par[1]
+    lambd <- exp(par[2])
+    thet <- exp(par[3])
+    bet <- par[4]
+    
+    # covariates
+    X <- as.matrix(x[x$tempo > 0, 3])
+    cens <- x[x$tempo > 0,1]
+    tempo <- x[x$tempo > 0,2]
+    
+    # model
+    aux2 <- log(lambd)*sum(cens) +
+        sum( cens*(alph*tempo + X%*%bet)) -
+        sum( cens*log( 1 + exp(alph*tempo + X%*%bet) ) ) - 
+        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/alph)*log( (1 + exp(alph*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
+    
+    return(-aux2)
+}
+
+data <- dados[,c(1,2,6)]
+data0 <- data.frame(tempo = dados$tempo,interc = rep(1,nrow(dados)),
+                    consulta = dados$x1, tipoDiv = dados$x4)
+emv0 <- optim(par=c(2, 1, 2), veroZero, x=data0, hessian = TRUE);emv0
+emvg <- optim(par=c(0.1, -0.5, -0.5, 0.1), veroGTDLFinal, x=data, hessian = TRUE);emvg
+maic(lv = -(emv0$value + emvg$value), k = 7)
+mbic(lv = -(emv0$value + emvg$value), k = 7, n = 9645)
