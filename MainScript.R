@@ -5,6 +5,7 @@ rm(list = ls())
 library(ggplot2)
 library(survival)
 library(msm) # pacote pra usar o método delta
+library(latex2exp)
 
 # Load and Treatment Data -------------------------------------------------
 
@@ -36,6 +37,42 @@ plot(resultado, xlim=c(0, 60), ylim=c(0, 1),
 legend(7, 1,
        title="Tipo de dívida", c("0 - Banco", "1 - outros segmentos"),
        lty = c(2, 2), col = c("black", "blue"), bty = "n")
+
+
+# verificação de proporcionalidade
+
+mod1 <- coxph(Surv(time = tempo[x4 == 0], event = status[x4 == 0])~1,
+              data = dados, method = "breslow")
+ss=survfit(mod1)
+H01=-log(ss$surv)
+time1=ss$time
+
+mod2 <- coxph(Surv(time = tempo[x4 == 1], event = status[x4 == 1])~1,
+              data = dados, method = "breslow")
+ss=survfit(mod2)
+H02=-log(ss$surv)
+time2=ss$time
+
+plot(time1, log(H01), type='l', ylim=c(-4, 1), main="time x log(H)", lwd=2)
+lines(time2, log(H02), lty=2, col="red", lwd=2)
+
+proporcionalidade <- data.frame(tempos = c(time1,time2), 
+                                nivel = c(rep(0,61),rep(1,61)), 
+                                H0 = c(log(H01),log(H02)))
+ggplot(data = proporcionalidade, mapping = aes(x = tempos, y = H0)) +
+    geom_line(mapping = aes(color = as.factor(nivel), linetype = as.factor(nivel))) +
+    labs(x = "Tempo (meses)", y = unname(TeX("log(\\hat{\\Lambda}(t))"))) +
+    scale_color_manual(values = c("black","blue")) +
+    scale_linetype_manual(values = c(1,2)) +
+    ylim(-4,1) + scale_x_continuous(breaks = seq(0,90,5)) +
+    theme_light() + 
+    theme(axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14),
+          legend.position = "none")
+
+
 
 
 # estimated Kaplan-Meier curve
@@ -73,7 +110,7 @@ ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv,
                      covar = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
 
 
-ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
+g1=ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
     geom_step(aes(color = as.factor(covar))) + 
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
          color = "Informação de Consulta") +
@@ -81,8 +118,15 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
                        values = c("red","blue")) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
     theme_light() + 
-    theme(legend.position = c(0.8,0.8),
-          legend.background = element_rect(color = "white"))
+    theme(legend.position = c(0.7,0.7),
+          legend.background = element_rect(color = "white"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.title=element_text(size=14), 
+          legend.text=element_text(size=12),
+          axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14))
 
 # smoothed graphic
 # gráfico alisado
@@ -108,7 +152,7 @@ ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = dados)
 ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
                      covar = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
 
-ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
+g2=ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
     geom_step(aes(color = as.factor(covar))) + 
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
          color = "Tipo de Dívida") +
@@ -116,8 +160,15 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
                        values = c("red","blue")) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
     theme_light() + 
-    theme(legend.position = c(0.8,0.8),
-          legend.background = element_rect(color = "white"))
+    theme(legend.position = c(0.7,0.7),
+          legend.background = element_rect(color = "white"),
+          plot.title = element_text(size = 16, face = "bold"),
+          legend.title=element_text(size=14), 
+          legend.text=element_text(size=12),
+          axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14))
 
 # smoothed graphic
 # gráfico alisado
@@ -135,7 +186,7 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
 LogRankX4 = survdiff(formula = Surv(tempo, status)~factor(x4), data = dados, rho=0)
 LogRankX4
 
-#ggpubr::ggarrange(g1,g2)
+ggpubr::ggarrange(g1,g2)
 
 
 # Model 1 GTDL Gamma ------------------------------------------------------
@@ -261,16 +312,16 @@ emvg <- optim(par=c(0.02, 0.5, 0.5, -1), veroGTDLg, x=data, hessian = TRUE);emvg
 egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
 
 ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = data)
-ekm_df <- data.frame(tempo = ekm$time,
-                     km = ekm$surv,
-                     covar = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
+ekm_df <- data.frame(tempo = c(0,0,ekm$time),
+                     km = c(1,1,ekm$surv),
+                     covar = c(0,1,rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
 
-gtdl_df <- data.frame(tempo = rep(seq(1,60,1),2),
-                      covar = c(rep(0,60),rep(1,60)))
+gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
+                      covar = c(rep(0,61),rep(1,61)))
 gtdl_df$surv <- sobrevGTDLg(x = gtdl_df, par = egpar)
 
 
-g2=ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
     geom_step(aes(color = as.factor(covar))) +
     geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x="Tempo (meses)", y="Estimativa de S(t)", 
@@ -282,8 +333,14 @@ g2=ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
     theme_light() + 
-    theme(legend.position = c(0.7,0.7),
-          legend.background = element_rect(color = "white"))
+    theme(legend.position = c(0.8,0.75),
+          legend.background = element_rect(color = "white"),
+          legend.title=element_text(size=14), 
+          legend.text=element_text(size=12),
+          axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14))
 
 ggpubr::ggarrange(g1,g2)
 
@@ -326,13 +383,15 @@ round(ic_beta1g,3);egpar[4];sd[4]
 veroGTDLp0 <- function(x, par) {
     
     # parameters
-    p0 <- par[1]
-    alph <- par[2]
-    lambd <- exp(par[3])
-    thet <- exp(par[4])
-    bet <- par[5:length(par)]
+    #p0 <- par[1]
+    alph <- par[1]
+    lambd <- exp(par[2])
+    thet <- exp(par[3])
+    bet <- par[4:length(par)]
     n0 <- nrow(x[x$tempo == 0,])
     n1 <- nrow(x[x$tempo > 0,])
+    n <- nrow(x)
+    p0 <- n0/n
     
     # covariates
     X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
@@ -351,11 +410,12 @@ veroGTDLp0 <- function(x, par) {
 # GTDL Gamma p0 Survival Model
 sobrevGTDLp0 <- function(x, par) {
     
-    p0 <- par[1]
-    alph <- par[2]
-    lambd <- par[3]
-    thet <- par[4]
-    bet <- par[5:length(par)]
+    #p0 <- par[1]
+    alph <- par[1]
+    lambd <- par[2]
+    thet <- par[3]
+    bet <- par[4:length(par)]
+    p0 <- nrow(x[x$tempo == 0,])/nrow(x)
     tempo <- x$tempo
     X <- as.matrix(x[, 2:ncol(x)])
     st <- (1-p0) * (1 + ( (lambd*thet/alph) * log( (1 + exp(alph*tempo + X%*%bet) )/(1 + exp(X%*%bet))) ) )^(-1/thet)
@@ -448,8 +508,8 @@ round(ic_beta1g,3);round(ep0par[5],3);round(sd[5],3)
 
 data <- dados[,c(1,2,6)]
 
-emvp0 <- optim(par=c(0.25,0.1,-0.5,-0.5,0.1), veroGTDLp0, x=data, hessian = TRUE);emvp0
-ep0par <- c(emvp0$par[1], emvp0$par[2], exp(emvp0$par[3]), exp(emvp0$par[4]), emvp0$par[5])
+emvp0 <- optim(par=c(0.1,-0.5,-0.5,0.1), veroGTDLp0, x=data, hessian = TRUE);emvp0
+ep0par <- c(emvp0$par[1], exp(emvp0$par[2]), exp(emvp0$par[3]), emvp0$par[4])
 
 ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = data)
 ekm_df <- data.frame(tempo = ekm$time,
@@ -458,12 +518,12 @@ ekm_df <- data.frame(tempo = ekm$time,
 
 # GTDL survival curve estimation
 # estimação da curva de sobrevivência GTDL
-gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
-                      covar = c(rep(0,61),rep(1,61)))
+gtdl_df <- data.frame(tempo = data$tempo,
+                      covar = data$x4)
 gtdl_df$surv <- sobrevGTDLp0(x = gtdl_df, par = ep0par)
 
 
-g2=ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
     geom_step(aes(color = as.factor(consulta))) +
     geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x="Tempo (meses)", y="Estimativa de S(t)", 
@@ -475,8 +535,14 @@ g2=ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
     theme_light() + 
-    theme(legend.position = c(0.7,0.7),
-          legend.background = element_rect(color = "white"))
+    theme(legend.position = c(0.8,0.75),
+          legend.background = element_rect(color = "white"),
+          legend.title=element_text(size=14), 
+          legend.text=element_text(size=12),
+          axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14))
 
 
 
@@ -723,8 +789,14 @@ ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
     theme_light() + 
-    theme(legend.position = c(0.7,0.7),
-          legend.background = element_rect(color = "white"))
+    theme(legend.position = c(0.8,0.75),
+          legend.background = element_rect(color = "white"),
+          legend.title=element_text(size=14), 
+          legend.text=element_text(size=12),
+          axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14))
 
 ggpubr::ggarrange(g1,g2)
 
@@ -962,20 +1034,26 @@ gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
                       covar = c(rep(0,61),rep(1,61)))
 gtdl_df$surv <- sobrevGTDLv2(x = gtdl_df, par = epar)
 
-g2=ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) + 
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) + 
     geom_step(aes(color = as.factor(covar))) + 
     geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x="Tempo (meses)", y="Estimativa de S(t)", 
          color="Tipo de Dívida por Kaplan-Meier",
-         linetype="Tipo de Dívida por GTDL \nZero Inflacionado") +
+         linetype = unname(TeX("Tipo de Dívida por GTDL \nZero Inflacionado e regressão no \\alpha")))+
     scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
                        values = c("red", "blue")) +
     scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
                           values = c(1,2)) +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
     theme_light() + 
-    theme(legend.position = c(0.7,0.7),
-          legend.background = element_rect(color = "white"))
+    theme(legend.position = c(0.75,0.75),
+          legend.background = element_rect(color = "white"),
+          legend.title=element_text(size=14), 
+          legend.text=element_text(size=12),
+          axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14))
 
 
 ggpubr::ggarrange(g1,g2)
