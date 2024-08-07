@@ -15,7 +15,7 @@ dados <- read.table(file = "dados_censura_versao4.txt", header = TRUE)
 # Descriptive Analysis ------------------------------------------------------
 
 # barplot of time to fail 
-aux <- data.frame(tempo = dados$tempo[dados$tempo < 25])
+aux <- data.frame(tempo = dados$tempo[dados$status == 1])
 ggplot(aux, aes(x = tempo)) + 
     geom_bar() + ylim(0,2400)
 
@@ -53,16 +53,21 @@ ss=survfit(mod2)
 H02=-log(ss$surv)
 time2=ss$time
 
+# gráfico de proporcionalidade pelo R base
 plot(time1, log(H01), type='l', ylim=c(-4, 1), main="time x log(H)", lwd=2)
 lines(time2, log(H02), lty=2, col="red", lwd=2)
+legend(1, -2.5,
+       title="Tipo de dívida", c("0 - Banco", "1 - outros segmentos"),
+       lty = c(2, 2), col = c("black", "red"), bty = "n")
 
+# gráfico de proporcionalidade por ggplot2
 proporcionalidade <- data.frame(tempos = c(time1,time2), 
                                 nivel = c(rep(0,61),rep(1,61)), 
                                 H0 = c(log(H01),log(H02)))
 ggplot(data = proporcionalidade, mapping = aes(x = tempos, y = H0)) +
     geom_line(mapping = aes(color = as.factor(nivel), linetype = as.factor(nivel))) +
     labs(x = "Tempo (meses)", y = unname(TeX("log(\\hat{\\Lambda}(t))"))) +
-    scale_color_manual(values = c("black","blue")) +
+    scale_color_manual(values = c("black","blue"), labels = c("0 - Bancos", "1 - Outros Segmentos")) +
     scale_linetype_manual(values = c(1,2)) +
     ylim(-4,1) + scale_x_continuous(breaks = seq(0,90,5)) +
     theme_light() + 
@@ -73,15 +78,13 @@ ggplot(data = proporcionalidade, mapping = aes(x = tempos, y = H0)) +
           legend.position = "none")
 
 
-
-
 # estimated Kaplan-Meier curve
 # curva de Kaplan-Meier estimada
 ekm <- survfit(Surv(time = tempo, event = status) ~ 1, data = dados)
 ekm_df <- data.frame(tempo = ekm$time,
                      km = ekm$surv)
 
-# graph with limits
+# graph of estimated Kaplan-Meier curve with p0 and p1 limits
 ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
     geom_line() + labs(x = "Tempos", y = "S(t)") +
     ylim(0:1) + scale_x_continuous(breaks = seq(0,60,5)) +
@@ -104,13 +107,11 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
 # estimated Kaplan-Meier curve with query covariate
 # curva de Kaplan-Meier estimada com COVARIÁVEL DE CONSULTA
 ekm <- survfit(Surv(time = tempo, event = status) ~ x1, data = dados)
-# ekm_df <- data.frame(tempo = c(0,0, ekm$time), km = c(1,1, ekm$surv), 
-#                      covar = c(0,1, rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
 ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
                      covar = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
 
 
-g1=ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
+ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
     geom_step(aes(color = as.factor(covar))) + 
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
          color = "Informação de Consulta") +
@@ -144,15 +145,14 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
 LogRankX1 = survdiff(formula = Surv(tempo, status)~factor(x1), data = dados, rho=0)
 LogRankX1
 
+
 # estimated Kaplan-Meier curve with query covariate
 # curva de Kaplan-Meier estimada com COVARIÁVEL DE TIPO DE DIVIDA
 ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = dados)
-# ekm_df <- data.frame(tempo = c(0,0, ekm$time), km = c(1,1, ekm$surv), 
-#                      covar = c(0,1, rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
 ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
                      covar = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])))
 
-g2=ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
+ggplot(data = ekm_df, mapping = aes(tempo, km)) + 
     geom_step(aes(color = as.factor(covar))) + 
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)", 
          color = "Tipo de Dívida") +
@@ -186,7 +186,6 @@ ggplot(data = ekm_df, mapping = aes(tempo, km)) +
 LogRankX4 = survdiff(formula = Surv(tempo, status)~factor(x4), data = dados, rho=0)
 LogRankX4
 
-ggpubr::ggarrange(g1,g2)
 
 
 # Model 1 GTDL Gamma ------------------------------------------------------
@@ -230,6 +229,80 @@ sobrevGTDLg <- function(x, par) {
 
 
 # Aplication Model 1 ------------------------------------------------------
+
+
+# VARIABLE TYPE OF DEBT
+# VARIÁVEL TIPO DE DÍVIDA
+
+data <- dados[dados$tempo > 0,c(1,2,6)]
+#data$tempo[data$tempo == 0] <- 10^-3
+
+emvg <- optim(par=c(0.02, 0.5, 0.5, -1), veroGTDLg, x=data, hessian = TRUE);emvg
+egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
+
+ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = data)
+ekm_df <- data.frame(tempo = c(0,0,ekm$time),
+                     km = c(1,1,ekm$surv),
+                     covar = c(0,1,rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
+
+gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
+                      covar = c(rep(0,61),rep(1,61)))
+gtdl_df$surv <- sobrevGTDLg(x = gtdl_df, par = egpar)
+
+
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+    geom_step(aes(color = as.factor(covar))) +
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
+    labs(x="Tempo (meses)", y="Estimativa de S(t)", 
+         color="Tipo de Dívida por Kaplan-Meier",
+         linetype="Tipo de Dívida por GTDL Gama") +
+    scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
+                       values = c("red","blue")) +
+    scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
+                          values = c(1,2)) +
+    ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
+    theme_light() + 
+    theme(legend.position = c(0.8,0.75),
+          legend.background = element_rect(color = "white"),
+          legend.title=element_text(size=14), 
+          legend.text=element_text(size=12),
+          axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14))
+
+
+# estimation of the confidence interval of the parameters
+# estimação do intervalo de confiança dos parâmetros
+sd <- sqrt(diag(solve(emvg$hessian)))
+
+ic_alpha <- numeric()
+ic_alpha[1] <- egpar[1] -qnorm(0.975)*sd[1]
+ic_alpha[2] <- egpar[1] +qnorm(0.975)*sd[1]
+round(ic_alpha,3);egpar[1];sd[1]
+
+# desvio padrão pelo método delta
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[2], cov = solve(emvg$hessian)[2,2])
+ic_lambda <- numeric()
+ic_lambda[1] <- egpar[2] -qnorm(0.975)*sd
+ic_lambda[2] <- egpar[2] +qnorm(0.975)*sd
+round(ic_lambda,3);egpar[2];sd
+
+# desvio padrão pelo método delta
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
+ic_theta <- numeric()
+ic_theta[1] <- egpar[3] -qnorm(0.975)*sd
+ic_theta[2] <- egpar[3] +qnorm(0.975)*sd
+round(ic_theta,3);egpar[3];sd
+
+sd <- sqrt(diag(solve(emvg$hessian)))
+ic_beta1g <- numeric()
+ic_beta1g[1] <- egpar[4] -qnorm(0.975)*sd[4]
+ic_beta1g[2] <- egpar[4] +qnorm(0.975)*sd[4]
+round(ic_beta1g,3);egpar[4];sd[4]
+
+
+
 
 
 # QUERY VARIABLE
@@ -302,79 +375,6 @@ ic_beta1g[2] <- egpar[4] +qnorm(0.975)*sd[4]
 round(ic_beta1g,3);egpar[4];sd[4]
 
 
-# VARIABLE TYPE OF DEBT
-# VARIÁVEL TIPO DE DÍVIDA
-
-data <- dados[dados$tempo > 0,c(1,2,6)]
-#data$tempo[data$tempo == 0] <- 10^-3
-
-emvg <- optim(par=c(0.02, 0.5, 0.5, -1), veroGTDLg, x=data, hessian = TRUE);emvg
-egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
-
-ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = data)
-ekm_df <- data.frame(tempo = c(0,0,ekm$time),
-                     km = c(1,1,ekm$surv),
-                     covar = c(0,1,rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
-
-gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
-                      covar = c(rep(0,61),rep(1,61)))
-gtdl_df$surv <- sobrevGTDLg(x = gtdl_df, par = egpar)
-
-
-ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
-    geom_step(aes(color = as.factor(covar))) +
-    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
-    labs(x="Tempo (meses)", y="Estimativa de S(t)", 
-         color="Tipo de Dívida por Kaplan-Meier",
-         linetype="Tipo de Dívida por GTDL Gama") +
-    scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                       values = c("red","blue")) +
-    scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                          values = c(1,2)) +
-    ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_light() + 
-    theme(legend.position = c(0.8,0.75),
-          legend.background = element_rect(color = "white"),
-          legend.title=element_text(size=14), 
-          legend.text=element_text(size=12),
-          axis.text.y = element_text(size = 11),
-          axis.text.x = element_text(size = 11),
-          axis.title.x = element_text(size = 14),
-          axis.title.y = element_text(size = 14))
-
-ggpubr::ggarrange(g1,g2)
-
-
-# estimation of the confidence interval of the parameters
-# estimação do intervalo de confiança dos parâmetros
-sd <- sqrt(diag(solve(emvg$hessian)))
-
-ic_alpha <- numeric()
-ic_alpha[1] <- egpar[1] -qnorm(0.975)*sd[1]
-ic_alpha[2] <- egpar[1] +qnorm(0.975)*sd[1]
-round(ic_alpha,3);egpar[1];sd[1]
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[2], cov = solve(emvg$hessian)[2,2])
-ic_lambda <- numeric()
-ic_lambda[1] <- egpar[2] -qnorm(0.975)*sd
-ic_lambda[2] <- egpar[2] +qnorm(0.975)*sd
-round(ic_lambda,3);egpar[2];sd
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
-ic_theta <- numeric()
-ic_theta[1] <- egpar[3] -qnorm(0.975)*sd
-ic_theta[2] <- egpar[3] +qnorm(0.975)*sd
-round(ic_theta,3);egpar[3];sd
-
-sd <- sqrt(diag(solve(emvg$hessian)))
-ic_beta1g <- numeric()
-ic_beta1g[1] <- egpar[4] -qnorm(0.975)*sd[4]
-ic_beta1g[2] <- egpar[4] +qnorm(0.975)*sd[4]
-round(ic_beta1g,3);egpar[4];sd[4]
-
-
 
 # Model 2 GTDL p0 ---------------------------------------------------------
 
@@ -383,15 +383,15 @@ round(ic_beta1g,3);egpar[4];sd[4]
 veroGTDLp0 <- function(x, par) {
     
     # parameters
-    #p0 <- par[1]
-    alph <- par[1]
-    lambd <- exp(par[2])
-    thet <- exp(par[3])
-    bet <- par[4:length(par)]
+    p0 <- par[1]
+    alph <- par[2]
+    lambd <- exp(par[3])
+    thet <- exp(par[4])
+    bet <- par[5:length(par)]
     n0 <- nrow(x[x$tempo == 0,])
     n1 <- nrow(x[x$tempo > 0,])
     n <- nrow(x)
-    p0 <- n0/n
+    #p0 <- n0/n
     
     # covariates
     X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
@@ -410,12 +410,12 @@ veroGTDLp0 <- function(x, par) {
 # GTDL Gamma p0 Survival Model
 sobrevGTDLp0 <- function(x, par) {
     
-    #p0 <- par[1]
-    alph <- par[1]
-    lambd <- par[2]
-    thet <- par[3]
-    bet <- par[4:length(par)]
-    p0 <- nrow(x[x$tempo == 0,])/nrow(x)
+    p0 <- par[1]
+    alph <- par[2]
+    lambd <- par[3]
+    thet <- par[4]
+    bet <- par[5:length(par)]
+    #p0 <- nrow(x[x$tempo == 0,])/nrow(x)
     tempo <- x$tempo
     X <- as.matrix(x[, 2:ncol(x)])
     st <- (1-p0) * (1 + ( (lambd*thet/alph) * log( (1 + exp(alph*tempo + X%*%bet) )/(1 + exp(X%*%bet))) ) )^(-1/thet)
@@ -425,6 +425,85 @@ sobrevGTDLp0 <- function(x, par) {
 
 
 # Aplication Model 2 ------------------------------------------------------
+
+
+# VARIABLE TYPE OF DEBT
+# VARIÁVEL TIPO DE DÍVIDA
+
+data <- dados[,c(1,2,6)]
+
+emvp0 <- optim(par=c(0.25,0.1,-0.5,-0.5,0.1), veroGTDLp0, x=data, hessian = TRUE);emvp0
+ep0par <- c(emvp0$par[1], emvp0$par[2], exp(emvp0$par[3]), exp(emvp0$par[4]), emvp0$par[5])
+
+ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = data)
+ekm_df <- data.frame(tempo = ekm$time,
+                     km = ekm$surv,
+                     consulta = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
+
+# GTDL survival curve estimation
+# estimação da curva de sobrevivência GTDL
+gtdl_df <- data.frame(tempo = data$tempo,
+                      covar = data$x4)
+gtdl_df$surv <- sobrevGTDLp0(x = gtdl_df, par = ep0par)
+
+
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+    geom_step(aes(color = as.factor(consulta))) +
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
+    labs(x="Tempo (meses)", y="Estimativa de S(t)", 
+         color="Tipo de Dívida por Kaplan-Meier",
+         linetype="Tipo de Dívida por GTDL Gama p0") +
+    scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
+                       values = c("red","blue")) +
+    scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
+                          values = c(1,2)) +
+    ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
+    theme_light() + 
+    theme(legend.position = c(0.75,0.75),
+          legend.background = element_rect(color = "white"),
+          legend.title=element_text(size=14), 
+          legend.text=element_text(size=12),
+          axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14))
+
+
+# estimation of the confidence interval of the parameters
+# estimação do intervalo de confiança dos parâmetros
+sd <- sqrt(diag(solve(emvp0$hessian)))
+
+ic_p0 <- numeric()
+ic_p0[1] <- ep0par[1] -qnorm(0.975)*sd[1]
+ic_p0[2] <- ep0par[1] +qnorm(0.975)*sd[1]
+round(ic_p0,3);round(ep0par[1],3);round(sd[1],3)
+
+ic_alpha <- numeric()
+ic_alpha[1] <- ep0par[2] -qnorm(0.975)*sd[2]
+ic_alpha[2] <- ep0par[2] +qnorm(0.975)*sd[2]
+round(ic_alpha,3);round(ep0par[2],3);round(sd[2],3)
+
+# desvio padrão pelo método delta
+sd <- deltamethod(g = ~ exp(x1), mean = emvp0$par[2], cov = solve(emvp0$hessian)[2,2])
+ic_lambda <- numeric()
+ic_lambda[1] <- ep0par[3] -qnorm(0.975)*sd
+ic_lambda[2] <- ep0par[3] +qnorm(0.975)*sd
+round(ic_lambda,3);round(ep0par[3],3);round(sd,3)
+
+# desvio padrão pelo método delta
+sd <- deltamethod(g = ~ exp(x1), mean = emvp0$par[3], cov = solve(emvp0$hessian)[3,3])
+ic_theta <- numeric()
+ic_theta[1] <- ep0par[4] -qnorm(0.975)*sd
+ic_theta[2] <- ep0par[4] +qnorm(0.975)*sd
+round(ic_theta,3);round(ep0par[4],3);round(sd,3)
+
+sd <- sqrt(diag(solve(emvp0$hessian)))
+ic_beta1g <- numeric()
+ic_beta1g[1] <- ep0par[5] -qnorm(0.975)*sd[5]
+ic_beta1g[2] <- ep0par[5] +qnorm(0.975)*sd[5]
+round(ic_beta1g,3);round(ep0par[5],3);round(sd[5],3)
+
+
 
 # QUERY VARIABLE
 # VARIÁVEL CONSULTA
@@ -465,88 +544,6 @@ ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
     theme_light() + 
     theme(legend.position = c(0.7,0.7),
           legend.background = element_rect(color = "white"))
-
-
-# estimation of the confidence interval of the parameters
-# estimação do intervalo de confiança dos parâmetros
-sd <- sqrt(diag(solve(emvp0$hessian)))
-
-ic_p0 <- numeric()
-ic_p0[1] <- ep0par[1] -qnorm(0.975)*sd[1]
-ic_p0[2] <- ep0par[1] +qnorm(0.975)*sd[1]
-round(ic_p0,3);round(ep0par[1],3);round(sd[1],3)
-
-ic_alpha <- numeric()
-ic_alpha[1] <- ep0par[2] -qnorm(0.975)*sd[2]
-ic_alpha[2] <- ep0par[2] +qnorm(0.975)*sd[2]
-round(ic_alpha,3);round(ep0par[2],3);round(sd[2],3)
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvp0$par[2], cov = solve(emvp0$hessian)[2,2])
-ic_lambda <- numeric()
-ic_lambda[1] <- ep0par[3] -qnorm(0.975)*sd
-ic_lambda[2] <- ep0par[3] +qnorm(0.975)*sd
-round(ic_lambda,3);round(ep0par[3],3);round(sd,3)
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvp0$par[3], cov = solve(emvp0$hessian)[3,3])
-ic_theta <- numeric()
-ic_theta[1] <- ep0par[4] -qnorm(0.975)*sd
-ic_theta[2] <- ep0par[4] +qnorm(0.975)*sd
-round(ic_theta,3);round(ep0par[4],3);round(sd,3)
-
-sd <- sqrt(diag(solve(emvp0$hessian)))
-ic_beta1g <- numeric()
-ic_beta1g[1] <- ep0par[5] -qnorm(0.975)*sd[5]
-ic_beta1g[2] <- ep0par[5] +qnorm(0.975)*sd[5]
-round(ic_beta1g,3);round(ep0par[5],3);round(sd[5],3)
-
-
-
-# VARIABLE TYPE OF DEBT
-# VARIÁVEL TIPO DE DÍVIDA
-
-data <- dados[,c(1,2,6)]
-
-emvp0 <- optim(par=c(0.1,-0.5,-0.5,0.1), veroGTDLp0, x=data, hessian = TRUE);emvp0
-ep0par <- c(emvp0$par[1], exp(emvp0$par[2]), exp(emvp0$par[3]), emvp0$par[4])
-
-ekm <- survfit(Surv(time = tempo, event = status) ~ x4, data = data)
-ekm_df <- data.frame(tempo = ekm$time,
-                     km = ekm$surv,
-                     consulta = c(rep(0,ekm$strata[1]),rep(1,ekm$strata[2])) )
-
-# GTDL survival curve estimation
-# estimação da curva de sobrevivência GTDL
-gtdl_df <- data.frame(tempo = data$tempo,
-                      covar = data$x4)
-gtdl_df$surv <- sobrevGTDLp0(x = gtdl_df, par = ep0par)
-
-
-ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
-    geom_step(aes(color = as.factor(consulta))) +
-    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
-    labs(x="Tempo (meses)", y="Estimativa de S(t)", 
-         color="Tipo de Dívida por Kaplan-Meier",
-         linetype="Tipo de Dívida por GTDL Gama p0") +
-    scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                       values = c("red","blue")) +
-    scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                          values = c(1,2)) +
-    ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_light() + 
-    theme(legend.position = c(0.8,0.75),
-          legend.background = element_rect(color = "white"),
-          legend.title=element_text(size=14), 
-          legend.text=element_text(size=12),
-          axis.text.y = element_text(size = 11),
-          axis.text.x = element_text(size = 11),
-          axis.title.x = element_text(size = 14),
-          axis.title.y = element_text(size = 14))
-
-
-
-ggpubr::ggarrange(g1,g2)
 
 
 # estimation of the confidence interval of the parameters
@@ -652,6 +649,96 @@ sobrevGTDLv1 <- function(x, par) {
 # Aplication Model 3 --------------------------------------------------------------
 
 
+# VARIABLE TYPE OF DEBT
+# VARIÁVEL TIPO DE DÍVIDA
+
+data <- dados[,c(1,2,6)]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    tipoDiv = dados$x4)
+
+emvg <- optim(par=c(0.1,-0.5,-0.5,0.1), veroGTDLv1, x=data, hessian = TRUE);emvg
+egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
+
+emv0 <- optim(par=c(-0.5,0.5), veroZero, x=data0, hessian = TRUE);emv0
+e0par <- c(emv0$par[1], emv0$par[2])
+
+epar <- c(e0par, egpar); epar
+
+ekm <- survfit(Surv(tempo, status) ~ x4, data = data)
+ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
+                     covar = c(rep(0,ekm$strata[[1]]),rep(1,ekm$strata[[2]])))
+
+ekm_df$gtdl0 <- sobrevGTDLv1(ekm_df[,c(1,3)],epar)
+gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
+                      covar = c(rep(0,61),rep(1,61)))
+gtdl_df$surv <- sobrevGTDLv1(x = gtdl_df, par = epar)
+
+
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
+    geom_step(aes(color = as.factor(covar))) +
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
+    labs(x="Tempo (meses)", y="Estimativa de S(t)", 
+         color="Tipo de Dívida por Kaplan-Meier",
+         linetype="Tipo de Dívida por GTDL \nZero Inflacionado") +
+    scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
+                       values = c("red","blue")) +
+    scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
+                          values = c(1,2)) +
+    ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
+    theme_light() + 
+    theme(legend.position = c(0.78,0.75),
+          legend.background = element_rect(color = "white"),
+          legend.title=element_text(size=14), 
+          legend.text=element_text(size=12),
+          axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14))
+
+# estimation of the confidence interval of the parameters
+# estimação do intervalo de confiança dos parâmetros
+sd0 <- sqrt(diag(solve(emv0$hessian)))
+sdg <- sqrt(diag(solve(emvg$hessian)))
+sd <- c(sd0,sdg); sd
+
+ic_beta00 <- numeric()
+ic_beta00[1] <- epar[1] -qnorm(0.975)*sd[1]
+ic_beta00[2] <- epar[1] +qnorm(0.975)*sd[1]
+round(ic_beta00,3);round(epar[1],3);round(sd[1],3)
+
+ic_beta10 <- numeric()
+ic_beta10[1] <- epar[2] -qnorm(0.975)*sd[2]
+ic_beta10[2] <- epar[2] +qnorm(0.975)*sd[2]
+round(ic_beta10,3);round(epar[2],3);round(sd[2],3)
+
+ic_alpha <- numeric()
+ic_alpha[1] <- epar[3] -qnorm(0.975)*sd[3]
+ic_alpha[2] <- epar[3] +qnorm(0.975)*sd[3]
+round(ic_alpha,3);round(epar[3],3);round(sd[3],3)
+
+# desvio padrão pelo método delta
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[2], cov = solve(emvg$hessian)[2,2])
+ic_lambda <- numeric()
+ic_lambda[1] <- epar[4] -qnorm(0.975)*sd
+ic_lambda[2] <- epar[4] +qnorm(0.975)*sd
+round(ic_lambda,3);round(epar[4],3);round(sd,3)
+
+# desvio padrão pelo método delta
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
+ic_theta <- numeric()
+ic_theta[1] <- epar[5] -qnorm(0.975)*sd
+ic_theta[2] <- epar[5] +qnorm(0.975)*sd
+round(ic_theta,3);round(epar[5],3);round(sd,3)
+
+sd <- c(sd0,sdg)
+ic_beta1g <- numeric()
+ic_beta1g[1] <- epar[6] -qnorm(0.975)*sd[6]
+ic_beta1g[2] <- epar[6] +qnorm(0.975)*sd[6]
+round(ic_beta1g,3);round(epar[6],3);round(sd[6],3)
+
+
 # QUERY VARIABLE
 # VARIÁVEL CONSULTA
 
@@ -750,114 +837,10 @@ round(ic_beta1g,3);round(epar[6],3);round(sd[6],3)
 
 
 
-# VARIABLE TYPE OF DEBT
-# VARIÁVEL TIPO DE DÍVIDA
-
-data <- dados[,c(1,2,6)]
-data0 <- data.frame(status = dados$status,
-                    tempo = dados$tempo,
-                    interc = rep(1,nrow(dados)),
-                    tipoDiv = dados$x4)
-
-emvg <- optim(par=c(0.1,-0.5,-0.5,0.1), veroGTDLv1, x=data, hessian = TRUE);emvg
-egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
-
-emv0 <- optim(par=c(-0.5,0.5), veroZero, x=data0, hessian = TRUE);emv0
-e0par <- c(emv0$par[1], emv0$par[2])
-
-epar <- c(e0par, egpar); epar
-
-ekm <- survfit(Surv(tempo, status) ~ x4, data = data)
-ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
-                     covar = c(rep(0,ekm$strata[[1]]),rep(1,ekm$strata[[2]])))
-
-ekm_df$gtdl0 <- sobrevGTDLv1(ekm_df[,c(1,3)],epar)
-gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
-                      covar = c(rep(0,61),rep(1,61)))
-gtdl_df$surv <- sobrevGTDLv1(x = gtdl_df, par = epar)
-
-
-ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) +
-    geom_step(aes(color = as.factor(covar))) +
-    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
-    labs(x="Tempo (meses)", y="Estimativa de S(t)", 
-         color="Tipo de Dívida por Kaplan-Meier",
-         linetype="Tipo de Dívida por GTDL \nZero Inflacionado") +
-    scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                       values = c("red","blue")) +
-    scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                          values = c(1,2)) +
-    ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_light() + 
-    theme(legend.position = c(0.8,0.75),
-          legend.background = element_rect(color = "white"),
-          legend.title=element_text(size=14), 
-          legend.text=element_text(size=12),
-          axis.text.y = element_text(size = 11),
-          axis.text.x = element_text(size = 11),
-          axis.title.x = element_text(size = 14),
-          axis.title.y = element_text(size = 14))
-
-ggpubr::ggarrange(g1,g2)
-
-sd0 <- sqrt(diag(solve(emv0$hessian)))
-sdg <- sqrt(diag(solve(emvg$hessian)))
-sd <- c(sd0,sdg); sd
-
-ic_beta00 <- numeric()
-ic_beta00[1] <- epar[1] -qnorm(0.975)*sd[1]
-ic_beta00[2] <- epar[1] +qnorm(0.975)*sd[1]
-round(ic_beta00,3);round(epar[1],3);round(sd[1],3)
-
-ic_beta10 <- numeric()
-ic_beta10[1] <- epar[2] -qnorm(0.975)*sd[2]
-ic_beta10[2] <- epar[2] +qnorm(0.975)*sd[2]
-round(ic_beta10,3);round(epar[2],3);round(sd[2],3)
-
-ic_alpha <- numeric()
-ic_alpha[1] <- epar[3] -qnorm(0.975)*sd[3]
-ic_alpha[2] <- epar[3] +qnorm(0.975)*sd[3]
-round(ic_alpha,3);round(epar[3],3);round(sd[3],3)
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[2], cov = solve(emvg$hessian)[2,2])
-ic_lambda <- numeric()
-ic_lambda[1] <- epar[4] -qnorm(0.975)*sd
-ic_lambda[2] <- epar[4] +qnorm(0.975)*sd
-round(ic_lambda,3);round(epar[4],3);round(sd,3)
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
-ic_theta <- numeric()
-ic_theta[1] <- epar[5] -qnorm(0.975)*sd
-ic_theta[2] <- epar[5] +qnorm(0.975)*sd
-round(ic_theta,3);round(epar[5],3);round(sd,3)
-
-sd <- c(sd0,sdg)
-ic_beta1g <- numeric()
-ic_beta1g[1] <- epar[6] -qnorm(0.975)*sd[6]
-ic_beta1g[2] <- epar[6] +qnorm(0.975)*sd[6]
-round(ic_beta1g,3);round(epar[6],3);round(sd[6],3)
-
-
-
 # Model 4 GTDL Zero v2 ----------------------------------------------------------------
 
-# a versão 2 do GTDL Zero Inflacionada faz regressão no parâmetro alpha
-# que é o parâmetro responsável pelo ajuste da fração de cura
-
-# likelihood of zero inflation
-# verossimilhança da inflação de zeros
-veroZero <- function(x, beta) {
-    
-    # covariates
-    X0 <- as.matrix(x[x$tempo == 0, 3:ncol(x)])
-    X <- as.matrix(x[x$tempo > 0, 3:ncol(x)])
-     
-    # model
-    aux1 <- sum((X0%*%beta)) - sum(log( 1 + exp(X0%*%beta))) - sum(log(1 + exp(X%*%beta)))
-    return(-aux1)
-}
+# a versão 2 do GTDL Zero Inflacionada incluí na versão 1 a regressão no 
+# parâmetro alpha que é o parâmetro responsável pelo ajuste da fração de cura
 
 # likelihood of GTDL Gamma
 # verossimilhança da GTDL Gamma
@@ -907,6 +890,100 @@ sobrevGTDLv2 <- function(x, par) {
 # Aplication Model 4 --------------------------------------------------------------
 
 
+# VARIABLE TYPE OF DEBT
+# VARIÁVEL TIPO DE DÍVIDA
+
+data <- dados[,c(1,2,6)]
+data0 <- data.frame(status = dados$status,
+                    tempo = dados$tempo,
+                    interc = rep(1,nrow(dados)),
+                    consulta = dados$x4)
+
+emvg <- optim(par=c(-0.1, -0.1, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE, method = "BFGS");emvg
+egpar <- c(emvg$par[1], emvg$par[2], exp(emvg$par[3]), exp(emvg$par[4]), emvg$par[5])
+
+emv0 <- optim(par=c(2,1), veroZero, x=data0, hessian = TRUE);emv0
+e0par <- c(emv0$par[1], emv0$par[2])
+
+epar <- c(e0par, egpar); epar
+
+ekm <- survfit(Surv(tempo, status) ~ x4, data = data)
+ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
+                     covar = c(rep(0,ekm$strata[[1]]),rep(1,ekm$strata[[2]])))
+
+gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
+                      covar = c(rep(0,61),rep(1,61)))
+gtdl_df$surv <- sobrevGTDLv2(x = gtdl_df, par = epar)
+
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) + 
+    geom_step(aes(color = as.factor(covar))) + 
+    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
+    labs(x="Tempo (meses)", y="Estimativa de S(t)", 
+         color="Tipo de Dívida por Kaplan-Meier",
+         linetype = unname(TeX("Tipo de Dívida por GTDL \nZero Inflacionado e regressão no \\alpha")))+
+    scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
+                       values = c("red", "blue")) +
+    scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
+                          values = c(1,2)) +
+    ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
+    theme_light() + 
+    theme(legend.position = c(0.75,0.75),
+          legend.background = element_rect(color = "white"),
+          legend.title=element_text(size=14), 
+          legend.text=element_text(size=12),
+          axis.text.y = element_text(size = 11),
+          axis.text.x = element_text(size = 11),
+          axis.title.x = element_text(size = 14),
+          axis.title.y = element_text(size = 14))
+
+
+# estimation of the confidence interval of the parameters
+# estimação do intervalo de confiança dos parâmetros
+sd0 <- sqrt(diag(solve(emv0$hessian)))
+sdg <- sqrt(diag(solve(emvg$hessian)))
+sd <- c(sd0,sdg); sd
+
+ic_beta00 <- numeric()
+ic_beta00[1] <- epar[1] -qnorm(0.975)*sd[1]
+ic_beta00[2] <- epar[1] +qnorm(0.975)*sd[1]
+round(ic_beta00,3);round(epar[1],3);round(sd[1],3)
+
+ic_beta10 <- numeric()
+ic_beta10[1] <- epar[2] -qnorm(0.975)*sd[2]
+ic_beta10[2] <- epar[2] +qnorm(0.975)*sd[2]
+round(ic_beta10,3);round(epar[2],3);round(sd[2],3)
+
+ic_alpha0 <- numeric()
+ic_alpha0[1] <- epar[3] -qnorm(0.975)*sd[3]
+ic_alpha0[2] <- epar[3] +qnorm(0.975)*sd[3]
+round(ic_alpha0,3);round(epar[3],3);round(sd[3],3)
+
+ic_alpha1 <- numeric()
+ic_alpha1[1] <- epar[4] -qnorm(0.975)*sd[4]
+ic_alpha1[2] <- epar[4] +qnorm(0.975)*sd[4]
+round(ic_alpha1,3);round(epar[4],3);round(sd[4],3)
+
+# desvio padrão pelo método delta
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
+ic_lambda <- numeric()
+ic_lambda[1] <- epar[5] -qnorm(0.975)*sd
+ic_lambda[2] <- epar[5] +qnorm(0.975)*sd
+round(ic_lambda,3);round(epar[5],3);round(sd,3)
+
+# desvio padrão pelo método delta
+sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[4], cov = solve(emvg$hessian)[4,4])
+ic_theta <- numeric()
+ic_theta[1] <- epar[6] -qnorm(0.975)*sd
+ic_theta[2] <- epar[6] +qnorm(0.975)*sd
+round(ic_theta,3);round(epar[6],3);round(sd,3)
+
+sd <- c(sd0,sdg)
+ic_beta1g <- numeric()
+ic_beta1g[1] <- epar[7] -qnorm(0.975)*sd[7]
+ic_beta1g[2] <- epar[7] +qnorm(0.975)*sd[7]
+round(ic_beta1g,3);round(epar[7],3);round(sd[7],3)
+
+
 # QUERY VARIABLE
 # VARIÁVEL CONSULTA
 
@@ -944,7 +1021,7 @@ gtdl_df$surv <- sobrevGTDLv2(x = gtdl_df, par = epar)
 
 # Graph of survival curves by Kaplan Meyer (KM) and GTDL
 # Gráfico das curvas de sobrevivência por Kaplan Meyer (KM) e por GTDL
-g1=ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) + 
+ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) + 
     geom_step(aes(color = as.factor(consulta))) + 
     geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
     labs(x = "Tempo (meses)", y = "Estimativa de S(t)",
@@ -1005,215 +1082,6 @@ ic_beta1g <- numeric()
 ic_beta1g[1] <- epar[7] -qnorm(0.975)*sd[7]
 ic_beta1g[2] <- epar[7] +qnorm(0.975)*sd[7]
 round(ic_beta1g,3);round(epar[7],3);round(sd[7],3)
-
-
-
-# VARIABLE TYPE OF DEBT
-# VARIÁVEL TIPO DE DÍVIDA
-
-data <- dados[,c(1,2,6)]
-data0 <- data.frame(status = dados$status,
-                    tempo = dados$tempo,
-                    interc = rep(1,nrow(dados)),
-                    consulta = dados$x4)
-
-emvg <- optim(par=c(-0.1, -0.1, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE, method = "BFGS");emvg
-#emvg <- optim(par=c(0.1, 0.5, -0.5, -0.5, 0.1), veroGTDLv2, x=data, hessian = TRUE);emvg
-egpar <- c(emvg$par[1], emvg$par[2], exp(emvg$par[3]), exp(emvg$par[4]), emvg$par[5])
-
-emv0 <- optim(par=c(2,1), veroZero, x=data0, hessian = TRUE);emv0
-e0par <- c(emv0$par[1], emv0$par[2])
-
-epar <- c(e0par, egpar); epar
-
-ekm <- survfit(Surv(tempo, status) ~ x4, data = data)
-ekm_df <- data.frame(tempo = ekm$time, km = ekm$surv, 
-                     covar = c(rep(0,ekm$strata[[1]]),rep(1,ekm$strata[[2]])))
-
-gtdl_df <- data.frame(tempo = rep(seq(0,60,1),2),
-                      covar = c(rep(0,61),rep(1,61)))
-gtdl_df$surv <- sobrevGTDLv2(x = gtdl_df, par = epar)
-
-ggplot(data = ekm_df, mapping = aes(x = tempo, y = km)) + 
-    geom_step(aes(color = as.factor(covar))) + 
-    geom_line(data = gtdl_df, aes(x = tempo, y = surv, linetype = as.factor(covar))) +
-    labs(x="Tempo (meses)", y="Estimativa de S(t)", 
-         color="Tipo de Dívida por Kaplan-Meier",
-         linetype = unname(TeX("Tipo de Dívida por GTDL \nZero Inflacionado e regressão no \\alpha")))+
-    scale_color_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                       values = c("red", "blue")) +
-    scale_linetype_manual(labels = c("0 - Bancos", "1 - Outros Segmentos"),
-                          values = c(1,2)) +
-    ylim(0:1) + scale_x_continuous(breaks = seq(0,90,5)) +
-    theme_light() + 
-    theme(legend.position = c(0.75,0.75),
-          legend.background = element_rect(color = "white"),
-          legend.title=element_text(size=14), 
-          legend.text=element_text(size=12),
-          axis.text.y = element_text(size = 11),
-          axis.text.x = element_text(size = 11),
-          axis.title.x = element_text(size = 14),
-          axis.title.y = element_text(size = 14))
-
-
-ggpubr::ggarrange(g1,g2)
-
-sd0 <- sqrt(diag(solve(emv0$hessian)))
-sdg <- sqrt(diag(solve(emvg$hessian)))
-sd <- c(sd0,sdg); sd
-
-ic_beta00 <- numeric()
-ic_beta00[1] <- epar[1] -qnorm(0.975)*sd[1]
-ic_beta00[2] <- epar[1] +qnorm(0.975)*sd[1]
-round(ic_beta00,3);round(epar[1],3);round(sd[1],3)
-
-ic_beta10 <- numeric()
-ic_beta10[1] <- epar[2] -qnorm(0.975)*sd[2]
-ic_beta10[2] <- epar[2] +qnorm(0.975)*sd[2]
-round(ic_beta10,3);round(epar[2],3);round(sd[2],3)
-
-ic_alpha0 <- numeric()
-ic_alpha0[1] <- epar[3] -qnorm(0.975)*sd[3]
-ic_alpha0[2] <- epar[3] +qnorm(0.975)*sd[3]
-round(ic_alpha0,3);round(epar[3],3);round(sd[3],3)
-
-ic_alpha1 <- numeric()
-ic_alpha1[1] <- epar[4] -qnorm(0.975)*sd[4]
-ic_alpha1[2] <- epar[4] +qnorm(0.975)*sd[4]
-round(ic_alpha1,3);round(epar[4],3);round(sd[4],3)
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
-ic_lambda <- numeric()
-ic_lambda[1] <- epar[5] -qnorm(0.975)*sd
-ic_lambda[2] <- epar[5] +qnorm(0.975)*sd
-round(ic_lambda,3);round(epar[5],3);round(sd,3)
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[4], cov = solve(emvg$hessian)[4,4])
-ic_theta <- numeric()
-ic_theta[1] <- epar[6] -qnorm(0.975)*sd
-ic_theta[2] <- epar[6] +qnorm(0.975)*sd
-round(ic_theta,3);round(epar[6],3);round(sd,3)
-
-sd <- c(sd0,sdg)
-ic_beta1g <- numeric()
-ic_beta1g[1] <- epar[7] -qnorm(0.975)*sd[7]
-ic_beta1g[2] <- epar[7] +qnorm(0.975)*sd[7]
-round(ic_beta1g,3);round(epar[7],3);round(sd[7],3)
-
-
-
-
-
-# Model 5 GTDL Final -----------------------------------------------------------------
-
-
-# model final com covariáveis significativas
-
-veroZero <- function(x, gamma) {
-    
-    # covariates
-    X0 <- as.matrix(x[x$tempo == 0, 2:ncol(x)])
-    X <- as.matrix(x[x$tempo > 0, 2:ncol(x)])
-    
-    # model
-    aux1 <- sum((X0%*%gamma)) - sum(log( 1 + exp(X0%*%gamma))) - sum(log(1 + exp(X%*%gamma)))
-    return(-aux1)
-}
-
-# likelihood of GTDL Gamma
-# verossimilhança da GTDL Gamma
-veroGTDLFinal <- function(x, par) {
-    
-    # parameters
-    alph <- par[1]
-    lambd <- exp(par[2])
-    thet <- exp(par[3])
-    bet <- par[4]
-    
-    # covariates
-    X <- as.matrix(x[x$tempo > 0, 3])
-    cens <- x[x$tempo > 0,1]
-    tempo <- x[x$tempo > 0,2]
-    
-    # model
-    aux2 <- log(lambd)*sum(cens) +
-        sum( cens*(alph*tempo + X%*%bet)) -
-        sum( cens*log( 1 + exp(alph*tempo + X%*%bet) ) ) - 
-        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/alph)*log( (1 + exp(alph*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
-    
-    return(-aux2)
-}
-
-
-# Aplication Model 5 --------------------------------------------------------------
-
-
-data <- dados[,c(1,2,6)]
-data0 <- data.frame(tempo = dados$tempo,interc = rep(1,nrow(dados)),
-                    consulta = dados$x1, tipoDiv = dados$x4)
-
-# parameter estimation of zero inflation
-# estimação dos parâmetros da inflação de zeros
-emv0 <- optim(par=c(2, 1, 2), veroZero, x=data0, hessian = TRUE);emv0
-e0par <- c(emv0$par[1], emv0$par[2], emv0$par[3])
-
-# parameter estimation of GTDL Gamma
-# estimação dos parâmetros do GTDL Gamma
-emvg <- optim(par=c(0.1, -0.5, -0.5, 0.1), veroGTDLFinal, x=data, hessian = TRUE);emvg
-egpar <- c(emvg$par[1], exp(emvg$par[2]), exp(emvg$par[3]), emvg$par[4])
-
-# combinando os parâmetros estimados
-epar <- c(e0par, egpar); epar
-
-# estimation of the confidence interval of the parameters
-# estimação do intervalo de confiança dos parâmetros
-sd0 <- sqrt(diag(solve(emv0$hessian)))
-sdg <- sqrt(diag(solve(emvg$hessian)))
-sd <- c(sd0,sdg); sd
-
-ic_gama00 <- numeric()
-ic_gama00[1] <- epar[1] -qnorm(0.975)*sd[1]
-ic_gama00[2] <- epar[1] +qnorm(0.975)*sd[1]
-round(ic_gama00,3);round(epar[1],3);round(sd[1],3)
-
-ic_gamma1 <- numeric()
-ic_gamma1[1] <- epar[2] -qnorm(0.975)*sd[2]
-ic_gamma1[2] <- epar[2] +qnorm(0.975)*sd[2]
-round(ic_gamma1,3);round(epar[2],3);round(sd[2],3)
-
-ic_gamma2 <- numeric()
-ic_gamma2[1] <- epar[3] -qnorm(0.975)*sd[3]
-ic_gamma2[2] <- epar[3] +qnorm(0.975)*sd[3]
-round(ic_gamma2,3);round(epar[3],3);round(sd[3],3)
-
-ic_alpha <- numeric()
-ic_alpha[1] <- epar[4] -qnorm(0.975)*sd[4]
-ic_alpha[2] <- epar[4] +qnorm(0.975)*sd[4]
-round(ic_alpha,3);round(epar[4],3);round(sd[4],3)
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[2], cov = solve(emvg$hessian)[2,2])
-ic_lambda <- numeric()
-ic_lambda[1] <- epar[5] -qnorm(0.975)*sd
-ic_lambda[2] <- epar[5] +qnorm(0.975)*sd
-round(ic_lambda,3);round(epar[5],3);round(sd,2)
-
-# desvio padrão pelo método delta
-sd <- deltamethod(g = ~ exp(x1), mean = emvg$par[3], cov = solve(emvg$hessian)[3,3])
-ic_theta <- numeric()
-ic_theta[1] <- epar[6] -qnorm(0.975)*sd
-ic_theta[2] <- epar[6] +qnorm(0.975)*sd
-round(ic_theta,3);round(epar[6],3);round(sd,3)
-
-sd <- c(sd0,sdg)
-ic_beta1 <- numeric()
-ic_beta1[1] <- epar[7] -qnorm(0.975)*sd[7]
-ic_beta1[2] <- epar[7] +qnorm(0.975)*sd[7]
-round(ic_beta1,3);round(epar[7],3);round(sd[7],3)
-
-
 
 
 
@@ -1484,50 +1352,3 @@ emvg <- optim(par=c(-0.08,-0.13,-0.13,-0.5,-0.5,0.1,0.1), veroGTDLv2, x=data, he
 emv0 <- optim(par=c(-0.5,0.5,0.1), veroZero, x=data0, hessian = TRUE);emv0
 maic(lv = -(emvg$value + emv0$value), k = 10)
 mbic(lv = -(emvg$value + emv0$value), k = 10, n = 9645)
-
-
-
-# MODELO GTDL 0 SIGNIFICATIVAS
-
-veroZero <- function(x, gamma) {
-    
-    # covariates
-    X0 <- as.matrix(x[x$tempo == 0, 2:ncol(x)])
-    X <- as.matrix(x[x$tempo > 0, 2:ncol(x)])
-    
-    # model
-    aux1 <- sum((X0%*%gamma)) - sum(log( 1 + exp(X0%*%gamma))) - sum(log(1 + exp(X%*%gamma)))
-    return(-aux1)
-}
-
-# likelihood of GTDL Gamma
-# verossimilhança da GTDL Gamma
-veroGTDLFinal <- function(x, par) {
-    
-    # parameters
-    alph <- par[1]
-    lambd <- exp(par[2])
-    thet <- exp(par[3])
-    bet <- par[4]
-    
-    # covariates
-    X <- as.matrix(x[x$tempo > 0, 3])
-    cens <- x[x$tempo > 0,1]
-    tempo <- x[x$tempo > 0,2]
-    
-    # model
-    aux2 <- log(lambd)*sum(cens) +
-        sum( cens*(alph*tempo + X%*%bet)) -
-        sum( cens*log( 1 + exp(alph*tempo + X%*%bet) ) ) - 
-        sum( (cens + (1/thet))*log( 1 + ((thet*lambd/alph)*log( (1 + exp(alph*tempo + X%*%bet))/(1 + exp(X%*%bet)) )) ) )
-    
-    return(-aux2)
-}
-
-data <- dados[,c(1,2,6)]
-data0 <- data.frame(tempo = dados$tempo,interc = rep(1,nrow(dados)),
-                    consulta = dados$x1, tipoDiv = dados$x4)
-emv0 <- optim(par=c(2, 1, 2), veroZero, x=data0, hessian = TRUE);emv0
-emvg <- optim(par=c(0.1, -0.5, -0.5, 0.1), veroGTDLFinal, x=data, hessian = TRUE);emvg
-maic(lv = -(emv0$value + emvg$value), k = 7)
-mbic(lv = -(emv0$value + emvg$value), k = 7, n = 9645)
